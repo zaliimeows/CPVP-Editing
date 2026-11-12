@@ -627,7 +627,7 @@
     // o.geo = Transform scale punch start %      o.mo = S_BlurMoCurves z punch start
     // o.zb  = zoom blur strength   o.tw = Twitch settings ({a: amount, ...})
     // o.ch  = chroma amount        o.gl = [radius, exposure]     o.ex = exposure flash
-    // o.wv  = warp: {fx: "waves" | "bubble" | "puff", a: amount}
+    // o.wv  = warp: {fx: "waves" | "bubble" | "puff", a: amount}      o.fl = exposure flicker strength
 
     function warpFx(l, c, w, env) {
         var fx;
@@ -646,6 +646,14 @@
         }
     }
 
+    // exposure flicker that follows the hit envelope: bright frame, dim frame, fading out
+    function flickExp(l, c, v, env) {
+        var n = Math.max(2, Math.round(c.D / c.fd)), pts = [], e = env(1);
+        for (var i = 0; i < n; i++) pts.push([i / n, v * envAt(e, i / n) * ((i % 2 === 0) ? 1 : 0.25), "hold"]);
+        pts.push([1, 0]);
+        expo(l, c, pts);
+    }
+
     function stack(o) {
         return function (l, c) {
             var env = o.env || HIT;
@@ -660,6 +668,7 @@
             if (o.ch) chroma(l, c, 0, env(o.ch));
             if (o.gl) deepGlow(l, o.gl[0], 0, c, (o.glenv || SOFT)(o.gl[1]));
             if (o.ex) expo(l, c, HIT(o.ex));
+            if (o.fl) flickExp(l, c, o.fl, env);
         };
     }
 
@@ -822,6 +831,15 @@
     function shakeCut(l, c) {
         sShake(l, c, { freq: 16, x: 70, y: 50, tilt: 4 }, CUT(4));
         zoomBlur(l, c, 0.3, CUT(0.3));
+    }
+
+    // plain crossfade: the selected clip (the one coming in, on top) fades in over the cut
+    function mix(comp, sel, c) {
+        if (sel.length === 0) { warn("Select the clip that comes in. It has to sit above the old clip and overlap it."); return; }
+        var t0 = Math.max(0, comp.time - c.D / 2);
+        for (var i = 0; i < sel.length; i++) {
+            animate(tr(sel[i], "ADBE Opacity"), { t0: t0, D: c.D, fd: c.fd }, [[0, 0, "soft"], [1, opa(sel[i])]]);
+        }
     }
 
     // ================================================================ FLASH
@@ -2188,6 +2206,10 @@
             P("Warp Puff Hit", "hit", stack({ geo: 130, sh: { amp: 4, freq: 12, x: 24, y: 24, tilt: 2 }, wv: { fx: "puff", a: 0.6 }, ch: 0.9 }), "Lens puffs out on the hit and snaps back.", { len: 0.5 }),
             P("RGB Shake", "hit", stack({ sh: { amp: 4.5, freq: 16, x: 36, y: 28, z: 0.1, tilt: 2, rgb: 1.6 }, ch: 0.5 }), "Shake with the colours pulled apart.", { len: 0.5 }),
             P("Blur Shake", "hit", function (l, c) { stack({ sh: { amp: 4, freq: 12, x: 34, y: 34, tilt: 2, mb: 1.4 } })(l, c); blurFx(l, c, HIT(60)); }, "Shake under a blur that clears.", { len: 0.5 }),
+            P("Flicker Shake", "hit", stack({ sh: { amp: 4.5, freq: 14, x: 32, y: 30, tilt: 2.5 }, fl: 1.3 }), "Shake with a flicker that dies out with it.", { len: 0.5, lin: 1 }),
+            P("Flicker Hit", "hit", stack({ mo: 0.84, sh: { amp: 5.5, freq: 12, x: 30, y: 44, tilt: 3 }, ch: 0.6, gl: [280, 0.5], fl: 1.6 }), "Heavy hit: zoom punch, shake, chroma and a hard flicker.", { len: 0.6, lin: 1 }),
+            P("Flicker Rattle", "hit", stack({ sh: { amp: 3.2, freq: 22, x: 40, y: 16, tilt: 1.5 }, fl: 1.1, env: SUSTAIN }), "Buzzing rattle that flickers while it holds.", { len: 0.7, lin: 1 }),
+            P("Flicker Glow Shake", "hit", stack({ sh: { amp: 3.5, freq: 14, x: 28, y: 28, tilt: 2 }, gl: [340, 0.8], fl: 0.9 }), "Shake with glow and a softer flicker.", { len: 0.5, lin: 1 }),
             P("Beat Shake", "hit", stack({ sh: { amp: 2.6, freq: 14, x: 30, y: 24, z: 0.05, tilt: 1.5 } }), "Light shake for every beat.", { len: 0.35 }),
             P("Beat Hit Soft", "hit", stack({ mo: 0.94, sh: { amp: 2, freq: 12, x: 22, y: 22, tilt: 1 }, gl: [240, 0.6], env: SOFT }), "Soft beat hit with a touch of glow.", { len: 0.4 }),
             P("Beat Hit Hard", "hit", stack({ mo: 0.86, sh: { amp: 4, freq: 14, x: 30, y: 36, tilt: 2.5 }, ch: 0.5, gl: [300, 1.1] }), "Harder beat hit: shake, punch, chroma, glow.", { len: 0.45 }),
@@ -2216,6 +2238,9 @@
             P("Bass Shake", "hit", stack({ mo: 0.88, sh: { amp: 1.8, freq: 7, x: 14, y: 24, tilt: 0.6 }, env: function (v) { return [[0, v, "coast"], [1, 0]]; } }), "Slower, heavier shake for bass hits.", { len: 0.7 }),
             P("Double Shake", "hit", stack({ mo: 0.9, sh: { amp: 1.6, freq: 14, x: 16, y: 16, tilt: 0.6 }, env: DOUBLE }), "Two beat shakes in a row.", { len: 0.6 }),
             P("Blur Shake", "hit", stack({ mo: 0.93, sh: { amp: 1.4, freq: 14, x: 16, y: 14, tilt: 0.6 }, zb: 0.25, env: SOFT }), "Shake with a zoom blur pulse.", { len: 0.4 }),
+            P("Flicker Beat Shake", "hit", stack({ mo: 0.92, sh: { amp: 1.4, freq: 14, x: 16, y: 14, tilt: 0.6 }, fl: 0.8, env: SOFT }), "Beat shake with a light flicker.", { len: 0.4, lin: 1 }),
+            P("Flicker Beat Shake Hard", "hit", stack({ mo: 0.86, sh: { amp: 2.2, freq: 14, x: 20, y: 20, tilt: 1 }, fl: 1.2 }), "Stronger beat shake with a harder flicker.", { len: 0.4, lin: 1 }),
+            P("Flicker Glow Beat", "hit", stack({ mo: 0.94, sh: { amp: 1.2, freq: 14, x: 14, y: 14, tilt: 0.5 }, gl: [340, 0.7], fl: 0.7, env: SOFT }), "Small beat shake, glow and flicker.", { len: 0.45, lin: 1 }),
             P("Tilt Shake", "hit", function (l, c) { mirror(l); moCurves(l, c, [[0, 0.92, "out"], [1, 1]], [[0, 3, "out"], [1, 0]], null, null); sShake(l, c, { freq: 14, x: 14, y: 12, tilt: 1 }, SOFT(1.2)); }, "Shake with a small tilt.", { len: 0.45 })
         ]],
         ["CPVP", [
@@ -2243,6 +2268,7 @@
             P("Slow Into Kill", "self", leadIn, "Selected clip: goes into slow motion right on the playhead. Park it on the kill.", { len: 1 })
         ]],
         ["Transitions", [
+            P("Mix", "self", mix, "Crossfade: the selected clip fades in over the cut. Put it above the old clip so they overlap.", { len: 0.5 }),
             P("Spin Right", "trans", spin(1), "Full spin over the cut, slow-fast-slow.", { len: 0.8 }),
             P("Spin Left", "trans", spin(-1), "Full spin the other way.", { len: 0.8 }),
             P("Zoom In", "trans", zoomThrough(0.28, 2.6), "Zoom through the cut, forward.", { len: 0.6 }),

@@ -62,10 +62,10 @@ The default text font is Tropi Land Regular when it is installed, otherwise Aria
 ## Presets
 
 **Shakes**
-Heavy Hit, Mega Hit, Impact, Impact Punch, Impact Zoom Shake, Impact Crush, Impact Flash, Crystal Pop, Slam Down, Slam Side, Side Rattle, Twist Shake, Zoom Shake, Zoom Slam, Zoom Rattle, Zoom Pulse Shake, Warp Shake, Warp Bubble Shake, Warp Puff Hit, RGB Shake, Blur Shake, Beat Shake, Beat Hit Soft, Beat Hit Hard, Beat Bounce, Beat Glow Shake, Double Hit, Triple Tap, Bass Rumble, Jumpy Shake, Twitchy Shake, Earthquake, Tilt Swing, Twitch Burst, Twitch Slam, Twitch RGB, Glitch Shake
+Heavy Hit, Mega Hit, Impact, Impact Punch, Impact Zoom Shake, Impact Crush, Impact Flash, Crystal Pop, Slam Down, Slam Side, Side Rattle, Twist Shake, Zoom Shake, Zoom Slam, Zoom Rattle, Zoom Pulse Shake, Warp Shake, Warp Bubble Shake, Warp Puff Hit, RGB Shake, Blur Shake, Flicker Shake, Flicker Hit, Flicker Rattle, Flicker Glow Shake, Beat Shake, Beat Hit Soft, Beat Hit Hard, Beat Bounce, Beat Glow Shake, Double Hit, Triple Tap, Bass Rumble, Jumpy Shake, Twitchy Shake, Earthquake, Tilt Swing, Twitch Burst, Twitch Slam, Twitch RGB, Glitch Shake
 
 **Beat Shakes**
-Beat Shake, Beat Shake Soft, Beat Shake Hard, Punch Shake, Glow Shake, Chroma Shake, Flash Shake, Bass Shake, Double Shake, Blur Shake, Tilt Shake
+Beat Shake, Beat Shake Soft, Beat Shake Hard, Punch Shake, Glow Shake, Chroma Shake, Flash Shake, Bass Shake, Double Shake, Blur Shake, Flicker Beat Shake, Flicker Beat Shake Hard, Flicker Glow Beat, Tilt Shake
 
 **CPVP**
 Totem Pop, Crystal Blast, Anchor Boom, Kill Shot, Shield Break, Pearl Swap, Combo Rattle, Rainbow Anchor, Rainbow Hit
@@ -74,7 +74,7 @@ Totem Pop, Crystal Blast, Anchor Boom, Kill Shot, Shield Break, Pearl Swap, Comb
 Full Build-Up, Rising Shake, Slow Push In, Growing Glow, Rising Chroma, Riser Blur, Flicker Build, Tension Zoom, Heartbeat Shakes, Twitch Build, Slow Into Kill
 
 **Transitions**
-Spin Right, Spin Left, Zoom In, Zoom Out, Zoom Spin, Whip Left, Whip Right, Whip Up, Whip Down, Warp Wave, Vortex Twist, Fisheye Zoom, Blur Dip, Prism Flash, Flash Cut, Shake Cut, Glitch Cut
+Mix, Spin Right, Spin Left, Zoom In, Zoom Out, Zoom Spin, Whip Left, Whip Right, Whip Up, Whip Down, Warp Wave, Vortex Twist, Fisheye Zoom, Blur Dip, Prism Flash, Flash Cut, Shake Cut, Glitch Cut
 
 **Flash**
 White Flash, Pink Flash, Red Flash, Gold Flash, Purple Flash, Soft White Flash, Exposure Pulse, Invert Flash, Threshold Flash, Black Strobe, Dip to Black, Fade In, Fade Out
