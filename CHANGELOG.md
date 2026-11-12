@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.1
+
+- One click on a preset applies it. The Apply button is gone.
+- New categories: CPVP (Totem Pop, Crystal Blast, Anchor Boom, Rainbow Anchor and more), Audio, Text Out, Watermarks.
+- Beat Pumps are now Beat Shakes and carry a small shake.
+- Shakes use S_Shake and Twitch together and add a mirrored Motion Tile so the frame edge never shows. Mega Hit rebuilt.
+- Time Remap redone: kill ramps burst, dip into slow motion and ease back to normal speed. New Slow Into Kill and Build + Kill Ramp.
+- Text: animations keep the size and opacity of your layer, ins start where the layer starts, outs end where it ends. Many new ins, loops, pans and Light Sweep.
+- Text FX: coloured glows, neon, outline glow, gradients, plasma, flux, scanlines, bevel, Rainbow Scroll, Drop Shadow, 3D Text through Element. 3D Extrude rebuilt, Light Rays toned down.
+- Blur Names is a square shape layer with mosaic at 64. New Blur Chat and Blur Scoreboard.
+- New Light Blue and Pink grades. Less glow on the other grades and on Title Reveal.
+- Fades are even from start to end. Keyframes show as normal eased keys.
+- Spin transitions zoom in less. New Glow Flicker and Light Sweep.
+- Beat markers moved to Tools.
+
 ## 3.0
 
 First public version, under the new name CPVP Editing.

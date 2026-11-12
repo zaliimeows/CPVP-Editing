@@ -1,4 +1,4 @@
-// CPVP Editing  v3.0  -  one-click edit presets for crystal pvp edits in After Effects
+// CPVP Editing  v3.1  -  one-click edit presets for crystal pvp edits in After Effects
 // made by zalii
 //
 // Copyright (c) 2026 zalii. All rights reserved. See LICENSE.
@@ -9,8 +9,8 @@
 //          then open it from the Window menu.
 //
 // USE
-//   Park the playhead on the hit / beat / cut, pick a category, pick a preset, Apply
-//   (or double-click the preset).
+//   Park the playhead on the hit / beat / cut, pick a category and click a preset.
+//   One click applies it.
 //   "New adjustment layer" builds the preset on a short adjustment layer.
 //   "Selected layers" puts it straight on the selected layers.
 //   Length = how long the animation runs, in frames ("auto" picks a sensible length).
@@ -30,7 +30,7 @@
 
     // ---- CPVP Editing by zalii ---- identity
     var NAME = "CPVP Editing";
-    var VER = "3.0";
+    var VER = "3.1";
     var AUTHOR = "zalii";
     var CREDIT = NAME + " by " + AUTHOR;
 
@@ -219,10 +219,7 @@
                     b.push(shOut ? new KeyframeEase(sOut[d] * shOut[0], shOut[1]) : new KeyframeEase(sOut ? sOut[d] : 0, 16.667));
                 }
                 prop.setTemporalEaseAtKey(k, a, b);
-                var tIn = shIn ? KeyframeInterpolationType.BEZIER : KeyframeInterpolationType.LINEAR;
-                var tOut = shOut ? KeyframeInterpolationType.BEZIER : KeyframeInterpolationType.LINEAR;
-                if (segOut === "hold") tOut = KeyframeInterpolationType.HOLD;
-                if (!shIn || !shOut || segOut === "hold") prop.setInterpolationTypeAtKey(k, tIn, tOut);
+                if (segOut === "hold") prop.setInterpolationTypeAtKey(k, KeyframeInterpolationType.BEZIER, KeyframeInterpolationType.HOLD);
             }
         } catch (e) {
             log.push("EASING FAILED: " + prop.name + " (" + e.toString() + ")");
@@ -283,21 +280,36 @@
     // ---------------------------------------------------------------- building blocks
     // CPVP Editing by zalii. Lengths are given for a 1920 wide comp and scaled by c.sc.
 
-    function deepGlow(l, radius, exposure, c, pts) {
+    function glowExp(fx) {
+        if (fxIs(fx, "ADBE Glo2")) return ["ADBE Glo2-0004"];
+        if (fxIs(fx, "s_glow")) return ["Brightness"];
+        return ["PEDG-0002", "Exposure"];
+    }
+
+    // tint = [r, g, b] colours the glow
+    function deepGlow(l, radius, exposure, c, pts, tint) {
         var fx = addFx(l, ["PEDG", "S_Glow", "ADBE Glo2"]);
         if (!fx) return null;
-        var expNames = ["Exposure"];
         if (fxIs(fx, "ADBE Glo2")) {
             setP(fx, ["ADBE Glo2-0002"], 128);
             setP(fx, ["ADBE Glo2-0003"], radius / 4);
-            expNames = ["ADBE Glo2-0004"];
+            if (tint) {
+                setP(fx, ["ADBE Glo2-0007"], 2);
+                setP(fx, ["ADBE Glo2-0012"], [tint[0], tint[1], tint[2], 1]);
+                setP(fx, ["ADBE Glo2-0013"], [tint[0], tint[1], tint[2], 1]);
+            }
         } else if (fxIs(fx, "s_glow")) {
             setP(fx, ["Glow Width"], radius / 3);
-            expNames = ["Brightness"];
+            if (tint) setP(fx, ["Color"], [tint[0], tint[1], tint[2], 1]);
         } else {
-            setP(fx, ["Radius"], radius);
+            setP(fx, ["PEDG-0001", "Radius"], radius);
+            if (tint) {
+                setP(fx, ["PEDG-0037"], 1);
+                setP(fx, ["PEDG-0038"], [tint[0], tint[1], tint[2], 1]);
+                setP(fx, ["PEDG-0041"], 100);
+            }
         }
-        if (pts) animP(fx, expNames, c, pts); else setP(fx, expNames, exposure);
+        if (pts) animP(fx, glowExp(fx), c, pts); else setP(fx, glowExp(fx), exposure);
         return fx;
     }
 
@@ -324,7 +336,9 @@
         return fx;
     }
 
+    // Motion Tile, mirrored, 300 x 300: a shake never shows the frame edge
     function mirror(l) {
+        try { if (l.property("ADBE Effect Parade").property("ADBE Tile")) return; } catch (e) {}
         var fx = addFx(l, ["ADBE Tile"], true);
         if (!fx) return;
         setP(fx, ["ADBE Tile-0004"], 300);
@@ -360,6 +374,7 @@
 
     // S_Shake. o = {amp, freq, x, y, z, tilt, rgb, style, mb}   x / y in pixels at 1920 wide
     function sShake(l, c, o, pts) {
+        mirror(l);
         var fx = addFx(l, ["S_Shake"], true);
         if (!fx) return bakeShake(l, c, o, pts);
         if (o.style) setP(fx, ["Style"], o.style);
@@ -466,8 +481,8 @@
 
     // Twitch, driven by its real parameters. o = {sp, blur, light, slide, scale, color,
     // la: light amount, ba: blur amount, sa: slide amount, sca: scale amount, rgb, dir, spread}
-    function twitch(l, c, o, pts) {
-        var fx = addFx(l, ["Videocopilot Twitch"]);
+    function twitch(l, c, o, pts, quiet) {
+        var fx = addFx(l, ["Videocopilot Twitch"], quiet);
         if (!fx) return null;
         setP(fx, ["speed"], o.sp || 60);
         setP(fx, ["Blur"], o.blur ? 1 : 0);
@@ -595,7 +610,7 @@
             } else if (def.k === "look") {
                 def.f(makeAdj(comp, sel, def.n, 0, comp.duration), c, comp);
             } else {
-                def.f(makeAdj(comp, sel, def.n, start, D), c, comp);
+                def.f(makeAdj(comp, sel, def.n, start, D + comp.frameDuration), c, comp);
             }
         } catch (err) {
             log.push("ERROR: " + err.toString() + (err.line ? " (line " + err.line + ")" : ""));
@@ -634,12 +649,14 @@
     function stack(o) {
         return function (l, c) {
             var env = o.env || HIT;
+            mirror(l);
             if (o.geo) geo(l, c, { s: rest(env(1), o.geo, 100), mb: 180 });
             if (o.mo) moCurves(l, c, rest(env(1), o.mo, 1), null, null, null);
             if (o.sh) sShake(l, c, o.sh, env(o.sh.amp));
             if (o.wv) warpFx(l, c, o.wv, env);
             if (o.zb) zoomBlur(l, c, o.zb, env(o.zb));
             if (o.tw) twitch(l, c, o.tw, (o.twenv || SNAP)(o.tw.a));
+            else if (o.sh && o.tw !== 0) twitch(l, c, { sp: 80, slide: 1, blur: 1, sa: 30, ba: 40 }, env(Math.min(90, o.sh.amp * 12)), true);
             if (o.ch) chroma(l, c, 0, env(o.ch));
             if (o.gl) deepGlow(l, o.gl[0], 0, c, (o.glenv || SOFT)(o.gl[1]));
             if (o.ex) expo(l, c, HIT(o.ex));
@@ -717,7 +734,7 @@
     function spin(dir) {
         return function (l, c) {
             moCurves(l, c,
-                [[0, 1, "spin"], [0.5, 0.62, "spin"], [1, 1]],
+                [[0, 1, "spin"], [0.5, 0.88, "spin"], [1, 1]],
                 [[0, 0, "spin"], [1, 360 * dir]],
                 null, null, 1.3);
         };
@@ -843,14 +860,15 @@
     function dipBlack(comp, sel, c) {
         var D = Math.max(c.D, 0.3), t0 = Math.max(0, comp.time - D / 2);
         var s = makeSolid(comp, sel, "Dip to Black", [0, 0, 0], t0, D);
-        animate(tr(s, "ADBE Opacity"), { t0: t0, D: D, fd: c.fd }, [[0, 0, "in"], [0.5, 100, "coast"], [1, 0]]);
+        animate(tr(s, "ADBE Opacity"), { t0: t0, D: D, fd: c.fd }, [[0, 0, "soft"], [0.5, 100, "soft"], [1, 0]]);
     }
 
-    function fade(name, a, b, seg) {
+    // even fades: fade in ends clear, fade out stays black to the end of the comp
+    function fade(name, a, b) {
         return function (comp, sel, c) {
             var D = Math.max(c.D, 0.5);
-            var s = makeSolid(comp, sel, name, [0, 0, 0], c.t0, D);
-            animate(tr(s, "ADBE Opacity"), { t0: c.t0, D: D, fd: c.fd }, [[0, a, seg], [1, b]]);
+            var s = makeSolid(comp, sel, name, [0, 0, 0], c.t0, b === 100 ? Math.max(D, comp.duration - c.t0) : D);
+            animate(tr(s, "ADBE Opacity"), { t0: c.t0, D: D, fd: c.fd }, [[0, a, "soft"], [1, b]]);
         };
     }
 
@@ -1000,15 +1018,107 @@
         rectMask(s, 0, bar, w, h - bar, 0).maskMode = MaskMode.SUBTRACT;
     }
 
-    // small mosaic patch in the middle of the screen: drag it over a nametag / chat / scoreboard
-    function blurNames(comp, sel, c) {
-        var w = Math.round(comp.width * 0.24), h = Math.round(comp.height * 0.09);
-        var l = makeAdj(comp, sel, "Blur Names", c.t0, Math.max(comp.duration - c.t0, c.fd), w, h);
-        rectMask(l, 0, 0, w, h, 4);
-        var fx = addFx(l, ["ADBE Mosaic"]);
-        setP(fx, ["ADBE Mosaic-0001"], 16);
-        setP(fx, ["ADBE Mosaic-0002"], 6);
-        setP(fx, ["ADBE Mosaic-0003"], 1);
+    // mosaic patch: a square shape layer set as an adjustment layer. Move it, scale it
+    // or change the square under Contents. x / y are fractions of the comp.
+    function patch(name, x0, y0, x1, y1) {
+        return function (comp, sel, c) {
+            var l = comp.layers.addShape();
+            l.name = name;
+            mark(l);
+            l.property("ADBE Root Vectors Group").addProperty("ADBE Vector Group").name = "Square";
+            l.property("ADBE Root Vectors Group").property(1).property("ADBE Vectors Group").addProperty("ADBE Vector Shape - Rect");
+            l.property("ADBE Root Vectors Group").property(1).property("ADBE Vectors Group").property(1).property("ADBE Vector Rect Size").setValue([(x1 - x0) * comp.width, (y1 - y0) * comp.height]);
+            l.property("ADBE Root Vectors Group").property(1).property("ADBE Vectors Group").addProperty("ADBE Vector Graphic - Fill");
+            tr(l, "ADBE Position").setValue([(x0 + x1) / 2 * comp.width, (y0 + y1) / 2 * comp.height]);
+            l.adjustmentLayer = true;
+            var top = topOf(sel);
+            if (top) { try { l.moveBefore(top); } catch (e) {} }
+            var fx = addFx(l, ["ADBE Mosaic"]);
+            setP(fx, ["ADBE Mosaic-0001"], 64);
+            setP(fx, ["ADBE Mosaic-0002"], 64);
+            setP(fx, ["ADBE Mosaic-0003"], 1);
+        };
+    }
+
+    // light bar sweeping across. on text the points are in comp space
+    function lightSweep(l, c, x0, x1, y) {
+        var fx = addFx(l, ["CC Light Sweep"]);
+        if (!fx) return;
+        setP(fx, ["Width", "CC Light Sweep-0004"], 60 * c.sc);
+        setP(fx, ["Sweep Intensity", "CC Light Sweep-0005"], 70);
+        animP(fx, ["Center", "CC Light Sweep-0001"], c, [[0, [x0, y], "smooth"], [1, [x1, y]]]);
+    }
+    function sweepHit(l, c, comp) { lightSweep(l, c, -comp.width * 0.1, comp.width * 1.1, comp.height / 2); }
+
+    function glowOf(l) {
+        var g = l.property("ADBE Effect Parade"), names = ["PEDG", "S_Glow", "ADBE Glo2"];
+        for (var i = 0; i < names.length; i++) { try { if (g.property(names[i])) return g.property(names[i]); } catch (e) {} }
+        return null;
+    }
+
+    // glow that flickers. uses the glow already on the selected layer, or adds one
+    function flicker(comp, sel, c) {
+        var ls = [], i;
+        for (i = 0; i < sel.length; i++) ls.push(sel[i]);
+        if (ls.length === 0) ls.push(makeAdj(comp, sel, "Glow Flicker", 0, comp.duration));
+        for (i = 0; i < ls.length; i++) {
+            var l = ls[i], fx = glowOf(l) || deepGlow(l, 250, 0.8, null, null);
+            if (!fx) continue;
+            var p = getP(fx, glowExp(fx));
+            if (!p) continue;
+            var base = p.value || 0.8, t = Math.max(0, l.inPoint), end = Math.min(l.outPoint, comp.duration, t + 30), n = 0;
+            while (t < end) {
+                p.setValueAtTime(t, base * (0.45 + 0.55 * Math.abs(rnd(n * 1.3 + 2))));
+                t += 2 * c.fd;
+                n++;
+            }
+        }
+    }
+
+    // zalii's drop shadow
+    function dropShadow(comp, sel) {
+        if (sel.length === 0) { warn("Select the layer that gets the shadow."); return; }
+        for (var i = 0; i < sel.length; i++) {
+            var fx = addFx(sel[i], ["S_DropShadow", "ADBE Drop Shadow"]);
+            if (!fx) continue;
+            if (fxIs(fx, "ADBE")) {
+                setP(fx, ["ADBE Drop Shadow-0002"], 247);
+                setP(fx, ["ADBE Drop Shadow-0003"], 135);
+                setP(fx, ["ADBE Drop Shadow-0004"], 21);
+                setP(fx, ["ADBE Drop Shadow-0005"], 60);
+                continue;
+            }
+            setP(fx, ["S_DropShadow-0050"], [0, 0, 0, 1]);
+            setP(fx, ["S_DropShadow-0051"], 1);
+            setP(fx, ["S_DropShadow-0052"], 96.92);
+            setP(fx, ["S_DropShadow-0053"], 15.12);
+            setP(fx, ["S_DropShadow-0054"], 15.12);
+            setP(fx, ["S_DropShadow-0055"], 1);
+            setP(fx, ["S_DropShadow-0057"], 2);
+            setP(fx, ["S_DropShadow-0059"], 1);
+            setP(fx, ["S_DropShadow-0060"], 2);
+        }
+    }
+
+    // ================================================================ CPVP
+    // CPVP Editing by zalii. Hits named after what happens in the fight:
+    // a shake stack on an adjustment layer plus a colour flash on top.
+    function combo(name, o, col, str) {
+        return function (comp, sel, c) {
+            var l = makeAdj(comp, sel, name, c.t0, c.D + c.fd);
+            stack(o)(l, c);
+            if (!col) return;
+            var s = makeSolid(comp, sel, name + " Flash", col, c.t0, c.D * 0.6);
+            try { s.blendingMode = BlendingMode.ADD; } catch (e) {}
+            animate(tr(s, "ADBE Opacity"), { t0: c.t0, D: c.D * 0.6, fd: c.fd }, [[0, str, "hit"], [1, 0]]);
+        };
+    }
+
+    // hue keeps going round for the whole layer: rainbow anchors, crystals, totems
+    function rainbowLoop(l, c) {
+        var len = Math.max(1, Math.min(l.outPoint, l.inPoint + 60) - Math.max(0, l.inPoint));
+        hueKeys(l, { t0: Math.max(0, l.inPoint), D: len, fd: c.fd }, [[0, 0], [1, 360 * Math.max(1, Math.round(len / 1.5))]]);
+        deepGlow(l, 220, 0.25, null, null);
     }
 
     // ================================================================ CC
@@ -1043,12 +1153,11 @@
         lumetri(l, { "Temperature": -15, "Tint": 25, "Contrast": 30, "Shadows": -20, "Saturation": 115 });
         tintFx(l, [0.07, 0, 0.16, 1], [1, 0.86, 1, 1], 35);
         vignette(l);
-        deepGlow(l, 180, 0.4, null, null);
+        deepGlow(l, 160, 0.1, null, null);
     }
     function ccColdSteel(l) {
         lumetri(l, { "Temperature": -40, "Contrast": 35, "Highlights": 15, "Shadows": -25, "Saturation": 55 });
         vignette(l);
-        deepGlow(l, 250, 0.5, null, null);
     }
     function ccTealMoody(l) {
         lumetri(l, { "Temperature": -30, "Tint": -15, "Exposure": -0.4, "Contrast": 40, "Shadows": -30, "Saturation": 90 });
@@ -1057,13 +1166,12 @@
     }
     function ccPinkBloom(l) {
         lumetri(l, { "Temperature": 15, "Tint": 30, "Exposure": 0.3, "Contrast": 15, "Highlights": 20, "Saturation": 120 });
-        haze(l);
+        deepGlow(l, 300, 0.15, null, null);
     }
     function ccDarkPunch(l) {
         lumetri(l, { "Exposure": -0.2, "Contrast": 55, "Highlights": 20, "Shadows": -35, "Saturation": 125 });
         sharpen(l);
         vignette(l);
-        deepGlow(l, 150, 0.35, null, null);
     }
     function ccBlackWhite(l) {
         lumetri(l, { "Contrast": 60, "Highlights": 20, "Shadows": -30, "Saturation": 0 });
@@ -1072,23 +1180,30 @@
     function ccVibrant(l) {
         lumetri(l, { "Contrast": 30, "Shadows": -10, "Saturation": 150 });
         sharpen(l);
-        deepGlow(l, 120, 0.3, null, null);
     }
     function ccDarkGlow(l) {
         lumetri(l, { "Exposure": -1.6, "Contrast": 45, "Temperature": -25, "Saturation": 110 });
-        var g = deepGlow(l, 400, 2, null, null);
+        var g = deepGlow(l, 400, 0.9, null, null);
         if (g && fxIs(g, "PEDG")) setP(g, ["Threshold"], 75);
         vignette(l);
     }
     function ccGoldHour(l) {
         lumetri(l, { "Temperature": 35, "Tint": 8, "Contrast": 25, "Highlights": 10, "Shadows": -15, "Saturation": 115 });
         tintFx(l, [0.1, 0.04, 0, 1], [1, 0.95, 0.8, 1], 20);
-        deepGlow(l, 260, 0.45, null, null);
+        deepGlow(l, 220, 0.1, null, null);
     }
     function ccCrystal(l) {
         lumetri(l, { "Temperature": -10, "Tint": 35, "Contrast": 40, "Highlights": 25, "Shadows": -25, "Saturation": 130 });
         sharpen(l);
-        deepGlow(l, 200, 0.5, null, null);
+        deepGlow(l, 180, 0.12, null, null);
+    }
+    function ccLightBlue(l) {
+        lumetri(l, { "Temperature": -35, "Tint": -5, "Exposure": 0.15, "Contrast": 15, "Highlights": 10, "Shadows": -5, "Saturation": 110 });
+        tintFx(l, [0, 0.06, 0.14, 1], [0.82, 0.94, 1, 1], 22);
+    }
+    function ccPink(l) {
+        lumetri(l, { "Temperature": 10, "Tint": 40, "Exposure": 0.1, "Contrast": 18, "Shadows": -8, "Saturation": 118 });
+        tintFx(l, [0.14, 0, 0.09, 1], [1, 0.84, 0.94, 1], 28);
     }
     function ccMagicBullet(l) { addFx(l, ["MB LookSuite3"]); }
     function ccFilm(l) { addFx(l, ["S_FilmEffect", "S_Grain", "ADBE Noise"]); }
@@ -1106,11 +1221,11 @@
 
     function ke(speed, infl) { return [new KeyframeEase(speed, infl)]; }
 
-    // One ramp on the time remap value graph, from T to T+N, covering M seconds of footage.
-    // shape "kill":  instantly fast, then a long slow landing (steep short handle on the
-    //                first key, long flat handle on the second) - the cpvp after-kill curve
-    // shape "into":  mirror of that - slow, then snaps fast right at the end
-    function rampAt(p, T, N, M, shape, sharp, flat, fd) {
+    // One piece of the time remap graph from T to T+N that eats M seconds of footage.
+    // so / io = speed (x normal) and influence leaving the first key
+    // si / ii = speed and influence arriving at the second key
+    // Keys after it are moved so the rest of the clip stays in sync.
+    function seg(p, T, N, M, so, io, si, ii, fd) {
         var later = [], k;
         var vT = p.valueAtTime(T, false), top = 100000;
         try { if (p.hasMax) top = p.maxValue; } catch (e0) {}
@@ -1123,34 +1238,49 @@
         for (k = 0; k < later.length; k++) {
             if (later[k][0] > T + N + fd / 2) p.setValueAtTime(later[k][0], Math.min(top, Math.max(0, later[k][1] + (M - N))));
         }
-        var k1 = p.nearestKeyIndex(T), k2 = p.nearestKeyIndex(T + N);
-        var avg = M / N;
-        var steep = ke(sharp * avg, 8), soft = ke(0.18 * avg, flat), lin = ke(1, 0.1);
-        if (shape === "kill") {
-            p.setTemporalEaseAtKey(k1, lin, steep);
-            p.setTemporalEaseAtKey(k2, soft, lin);
-        } else {
-            p.setTemporalEaseAtKey(k1, lin, soft);
-            p.setTemporalEaseAtKey(k2, steep, lin);
+        var k1 = p.nearestKeyIndex(T), k2 = p.nearestKeyIndex(T + N), avg = M / N;
+        var in1 = ke(1, 16.667);
+        try { if (k1 > 1) in1 = p.keyInTemporalEase(k1); } catch (e1) {}
+        p.setTemporalEaseAtKey(k1, in1, ke(so * avg, io));
+        p.setTemporalEaseAtKey(k2, ke(si * avg, ii), ke(1, 16.667));
+    }
+
+    // the kill ramp: bursts fast on the playhead, dips into slow motion, eases back to normal
+    var KR = { norm: [4.5, 16, 1, 50], hard: [6, 15, 1, 45], soft: [2.6, 18, 1, 50] };
+    // the lead-in: normal, a little faster, then slow motion right on the kill
+    var LEAD = [1, 30, 0.2, 45];
+
+    function clips(sel, fn) {
+        if (sel.length === 0) { warn("Select the clip to time remap."); return; }
+        for (var i = 0; i < sel.length; i++) {
+            var p = remapOf(sel[i]);
+            if (!p) continue;
+            try { fn(p); } catch (e) { log.push(sel[i].name + ": " + e.toString()); }
         }
     }
 
-    // mult = how much footage the ramp eats compared with normal speed (1 = stays in sync)
-    // back = true: the ramp ends on the playhead instead of starting there
-    function ramp(shape, mult, sharp, flat, repeats, back) {
+    function killRamp(kind, repeats) {
         return function (comp, sel, c) {
-            if (sel.length === 0) { warn("Select the clip to time remap."); return; }
-            var all = lengthSeconds(comp, 1.0), N = all / repeats;
-            var T0 = back ? Math.max(0, comp.time - all) : comp.time;
-            for (var i = 0; i < sel.length; i++) {
-                var p = remapOf(sel[i]);
-                if (!p) continue;
-                for (var r = 0; r < repeats; r++) {
-                    try { rampAt(p, T0 + r * N, N, N * mult, shape, sharp, flat, c.fd); }
-                    catch (e) { log.push(sel[i].name + ": " + e.toString()); }
-                }
-            }
+            var all = lengthSeconds(comp, 1.0), N = all / repeats, s = KR[kind];
+            clips(sel, function (p) {
+                for (var r = 0; r < repeats; r++) seg(p, comp.time + r * N, N, N, s[0], s[1], s[2], s[3], c.fd);
+            });
         };
+    }
+
+    // ends on the playhead: park it on the kill
+    function leadIn(comp, sel, c) {
+        var N = lengthSeconds(comp, 1.0), T = Math.max(0, comp.time - N);
+        clips(sel, function (p) { seg(p, T, comp.time - T, comp.time - T, LEAD[0], LEAD[1], LEAD[2], LEAD[3], c.fd); });
+    }
+
+    // lead-in and kill ramp in one: slow motion into the kill, burst out of it
+    function leadKill(comp, sel, c) {
+        var N = lengthSeconds(comp, 1.0), T = Math.max(0, comp.time - N), s = KR.norm;
+        clips(sel, function (p) {
+            seg(p, T, comp.time - T, comp.time - T, LEAD[0], LEAD[1], LEAD[2], LEAD[3], c.fd);
+            seg(p, comp.time, N, N, s[0], s[1], s[2], s[3], c.fd);
+        });
     }
 
     // changes speed for the window, then carries on at normal speed
@@ -1312,22 +1442,52 @@
         for (var i = 0; i < sel.length; i++) {
             if (sel[i] instanceof TextLayer) out.push(sel[i]);
         }
-        if (out.length === 0) out.push(newText(comp, "TEXT", 120, comp.time, 0));
+        if (out.length === 0) out.push(newText(comp, "TEXT", 120, comp.time, 4));
         return out;
     }
 
-    function eachText(fn, minLen) {
+    // mode "in" (default): starts where the text layer starts
+    //      "out": ends where the text layer ends      "at": starts on the playhead
+    function eachText(fn, minLen, mode) {
         return function (comp, sel, c) {
-            var ls = textLayers(comp, sel);
-            var cc = { t0: c.t0, D: Math.max(c.D, minLen || 0.5), fd: c.fd, sc: c.sc, comp: comp };
-            for (var i = 0; i < ls.length; i++) fn(ls[i], cc, comp);
+            var ls = textLayers(comp, sel), D = Math.max(c.D, minLen || 0.5);
+            for (var i = 0; i < ls.length; i++) {
+                var l = ls[i], t0 = Math.max(0, l.inPoint);
+                if (mode === "out") t0 = Math.max(t0, l.outPoint - D - c.fd);
+                if (mode === "at") t0 = c.t0;
+                fn(l, { t0: t0, D: D, fd: c.fd, sc: c.sc, comp: comp }, comp);
+            }
         };
+    }
+
+    // the layer's own scale / opacity / position, so presets never reset your size
+    function scl(l, f) {
+        var v = tr(l, "ADBE Scale").value, o = [v[0] * f, v[1] * f];
+        if (v.length > 2) o.push(v[2]);
+        return o;
+    }
+    function opa(l) { return tr(l, "ADBE Opacity").value; }
+    function off(l, dx, dy) {
+        var v = tr(l, "ADBE Position").value, o = [v[0] + dx, v[1] + dy];
+        if (v.length > 2) o.push(v[2]);
+        return o;
+    }
+    // whole life of the layer, for loops
+    function life(l, c) {
+        var t0 = Math.max(0, l.inPoint);
+        return { t0: t0, D: Math.max(c.fd * 4, Math.min(l.outPoint, c.comp.duration, t0 + 30) - t0), fd: c.fd, sc: c.sc, comp: c.comp };
+    }
+    // where the text sits in the comp (effects on text use comp space)
+    function box(l, t) {
+        var r = l.sourceRectAtTime(t, false), a = tr(l, "ADBE Anchor Point").value, q = tr(l, "ADBE Position").value, v = tr(l, "ADBE Scale").value;
+        return { l: q[0] + (r.left - a[0]) * v[0] / 100, t: q[1] + (r.top - a[1]) * v[1] / 100, w: r.width * v[0] / 100, h: r.height * v[1] / 100 };
     }
 
     // text animator: props = [[matchName, value], ...]
     // sweep = shape used to key the range selector start 0 > 100. When the sweep is
     // done nothing is selected any more, so the text always ends sharp and fully visible.
-    function animator(l, c, name, props, sweep, smooth) {
+    // out = true: letters leave one by one instead of arriving
+    function animator(l, c, name, props, sweep, smooth, out) {
         var anims = l.property("ADBE Text Properties").property("ADBE Text Animators");
         var a = anims.addProperty("ADBE Text Animator");
         a.name = name;
@@ -1337,7 +1497,7 @@
         }
         a = anims.property(name);
         var s = a.property("ADBE Text Selectors").addProperty("ADBE Text Selector");
-        animate(s.property("ADBE Text Percent Start"), c, [[0, 0, sweep], [1, 100]]);
+        animate(s.property(out ? "ADBE Text Percent End" : "ADBE Text Percent Start"), c, [[0, 0, sweep], [1, 100]]);
         try { s.property("ADBE Text Range Advanced").property("ADBE Text Selector Smoothness").setValue(smooth === undefined ? 100 : smooth); } catch (e) {}
     }
 
@@ -1392,21 +1552,21 @@
     }, 0.7);
 
     var txPop = eachText(function (l, c) {
-        animate(tr(l, "ADBE Scale"), c, [[0, [165, 165, 100], "hit"], [1, [100, 100, 100]]]);
+        animate(tr(l, "ADBE Scale"), c, [[0, scl(l, 1.65), "hit"], [1, scl(l, 1)]]);
         textBlur(l, c, 60, "hit");
-        animate(tr(l, "ADBE Opacity"), c, [[0, 0, "snap"], [0.25, 100]]);
+        animate(tr(l, "ADBE Opacity"), c, [[0, 0, "snap"], [0.25, opa(l)]]);
     });
 
     var txZoomPunch = eachText(function (l, c) {
-        animate(tr(l, "ADBE Scale"), c, [[0, [40, 40, 100], "snap"], [0.35, [112, 112, 100], "smooth"], [1, [100, 100, 100]]]);
-        animate(tr(l, "ADBE Opacity"), c, [[0, 0, "snap"], [0.2, 100]]);
-        deepGlow(l, 220, 0, c, SOFT(1.4));
+        animate(tr(l, "ADBE Scale"), c, [[0, scl(l, 0.4), "snap"], [0.35, scl(l, 1.12), "smooth"], [1, scl(l, 1)]]);
+        animate(tr(l, "ADBE Opacity"), c, [[0, 0, "snap"], [0.2, opa(l)]]);
+        deepGlow(l, 180, 0, c, SOFT(0.5));
     });
 
     var txFlicker = eachText(function (l, c) {
-        var v = [0, 100, 0, 45, 0, 100, 25, 100], pts = [];
-        for (var i = 0; i < v.length; i++) pts.push([i / v.length, v[i], "hold"]);
-        pts.push([1, 100]);
+        var v = [0, 1, 0, 0.45, 0, 1, 0.25, 1], pts = [], o = opa(l);
+        for (var i = 0; i < v.length; i++) pts.push([i / v.length, v[i] * o, "hold"]);
+        pts.push([1, o]);
         animate(tr(l, "ADBE Opacity"), c, pts);
     });
 
@@ -1416,33 +1576,228 @@
         a.name = "Tracking";
         var p = a.property("ADBE Text Animator Properties").addProperty("ADBE Text Tracking Amount");
         animate(p, c, [[0, 110, "out"], [1, 0]]);
-        animate(tr(l, "ADBE Opacity"), c, [[0, 0, "coast"], [0.45, 100]]);
+        animate(tr(l, "ADBE Opacity"), c, [[0, 0, "coast"], [0.45, opa(l)]]);
     }, 0.8);
 
     var txGlitchIn = eachText(function (l, c) {
         twitch(l, c, { a: 150, sp: 90, slide: 1, light: 1, sa: 80, la: 200, rgb: 50, spread: 0.2 }, SNAP(150));
-        animate(tr(l, "ADBE Opacity"), c, [[0, 0, "hold"], [0.08, 100, "hold"], [0.16, 30, "hold"], [0.24, 100]]);
+        var o = opa(l);
+        animate(tr(l, "ADBE Opacity"), c, [[0, 0, "hold"], [0.08, o, "hold"], [0.16, o * 0.3, "hold"], [0.24, o]]);
     });
 
     var txWavy = eachText(function (l, c) {
         wave(l, c, "Wavy", [["ADBE Text Position 3D", [0, -26, 0]], ["ADBE Text Rotation", 8]], 1.2, 0, 40);
     });
 
+    var T_OP = "ADBE Text Opacity", T_POS = "ADBE Text Position 3D", T_SCL = "ADBE Text Scale 3D", T_ROT = "ADBE Text Rotation";
+
+    function txIn(name, props, sweep, len) {
+        return eachText(function (l, c) { animator(l, c, name, props, sweep); }, len || 0.6);
+    }
+    function txOut(name, props, sweep, len, smooth) {
+        return eachText(function (l, c) { animator(l, c, name, props, sweep, smooth, true); }, len || 0.6, "out");
+    }
+
+    var txSlideDown = txIn("Slide Down", [[T_POS, [0, -90, 0]], [T_OP, 0]], "out");
+    var txSlideLeft = txIn("Slide Left", [[T_POS, [140, 0, 0]], [T_OP, 0]], "out");
+    var txSlideRight = txIn("Slide Right", [[T_POS, [-140, 0, 0]], [T_OP, 0]], "out");
+    var txScaleIn = txIn("Scale In", [[T_SCL, [0, 0, 100]], [T_OP, 0]], "out");
+    var txSpinIn = txIn("Spin In", [[T_ROT, -180], [T_SCL, [30, 30, 100]], [T_OP, 0]], "out", 0.7);
+    var txStretch = txIn("Stretch In", [[T_SCL, [100, 320, 100]], [T_OP, 0]], "snap");
+    var txSkew = txIn("Skew In", [["ADBE Text Skew", 45], [T_POS, [-60, 0, 0]], [T_OP, 0]], "out");
+
+    var txFade = eachText(function (l, c) {
+        animate(tr(l, "ADBE Opacity"), c, [[0, 0, "soft"], [1, opa(l)]]);
+    }, 0.6);
+
+    var txBounce = eachText(function (l, c) {
+        animate(tr(l, "ADBE Scale"), c, [[0, scl(l, 0), "out"], [0.45, scl(l, 1.16), "smooth"], [0.72, scl(l, 0.95), "smooth"], [1, scl(l, 1)]]);
+    }, 0.6);
+
+    // ---- loops: run for the whole text layer
+    function loopKeys(prop, cc, a, b, period) {
+        var n = Math.min(60, Math.max(2, Math.round(cc.D / period))), pts = [];
+        for (var i = 0; i <= n; i++) pts.push([i / n, (i % 2 === 0) ? a : b, "smooth"]);
+        animate(prop, cc, pts);
+    }
+    var txPulse = eachText(function (l, c) { loopKeys(tr(l, "ADBE Scale"), life(l, c), scl(l, 1), scl(l, 1.06), 0.4); });
+    var txFloat = eachText(function (l, c) { loopKeys(tr(l, "ADBE Position"), life(l, c), off(l, 0, 9 * c.sc), off(l, 0, -9 * c.sc), 1); });
+    function txPan(dir) {
+        return eachText(function (l, c) {
+            animate(tr(l, "ADBE Position"), life(l, c), [[0, off(l, -dir * 70 * c.sc, 0)], [1, off(l, dir * 70 * c.sc, 0)]]);
+        });
+    }
+    var txSweep = eachText(function (l, c) {
+        var b = box(l, c.t0);
+        lightSweep(l, c, b.l - 80 * c.sc, b.l + b.w + 80 * c.sc, b.t + b.h / 2);
+    }, 0.8, "at");
+    function txGlowFlicker(comp, sel, c) { flicker(comp, textLayers(comp, sel), c); }
+
+    // ---- outs: end where the text layer ends
+    var txoFade = eachText(function (l, c) {
+        animate(tr(l, "ADBE Opacity"), c, [[0, opa(l), "soft"], [1, 0]]);
+    }, 0.6, "out");
+    var txoType = txOut("Typewriter Out", [[T_OP, 0]], "soft", 0.6, 0);
+    var txoSlide = txOut("Slide Out", [[T_POS, [0, 90, 0]], [T_OP, 0]], "in");
+    var txoDrop = txOut("Drop Out", [[T_POS, [0, 140, 0]], [T_ROT, 12], [T_OP, 0]], "in");
+    var txoBlur = txOut("Blur Out", [["ADBE Text Blur", [38, 38]], [T_OP, 0]], "in", 0.7);
+    var txoScramble = txOut("Scramble Out", [["ADBE Text Character Offset", 17], [T_OP, 0]], "in", 0.7);
+    var txoScale = txOut("Scale Out", [[T_SCL, [0, 0, 100]], [T_OP, 0]], "in");
+    var txoPop = eachText(function (l, c) {
+        animate(tr(l, "ADBE Scale"), c, [[0, scl(l, 1), "in"], [1, scl(l, 1.5)]]);
+        animate(tr(l, "ADBE Opacity"), c, [[0.4, opa(l), "in"], [1, 0]]);
+        var b = addFx(l, ["ADBE Gaussian Blur 2"]);
+        animP(b, ["ADBE Gaussian Blur 2-0001"], c, [[0, 0, "in"], [1, 50 * c.sc]]);
+    }, 0.5, "out");
+    var txoShrink = eachText(function (l, c) {
+        animate(tr(l, "ADBE Scale"), c, [[0, scl(l, 1), "in"], [1, scl(l, 0)]]);
+    }, 0.5, "out");
+    var txoTracking = eachText(function (l, c) {
+        var anims = l.property("ADBE Text Properties").property("ADBE Text Animators");
+        var a = anims.addProperty("ADBE Text Animator");
+        a.name = "Tracking Out";
+        animate(a.property("ADBE Text Animator Properties").addProperty("ADBE Text Tracking Amount"), c, [[0, 0, "in"], [1, 110]]);
+        animate(tr(l, "ADBE Opacity"), c, [[0.5, opa(l), "in"], [1, 0]]);
+    }, 0.8, "out");
+    var txoFlicker = eachText(function (l, c) {
+        var v = [1, 0.25, 1, 0, 0.45, 0, 1, 0], pts = [], o = opa(l);
+        for (var i = 0; i < v.length; i++) pts.push([i / v.length, v[i] * o, "hold"]);
+        pts.push([1, 0]);
+        animate(tr(l, "ADBE Opacity"), c, pts);
+    }, 0.5, "out");
+    var txoGlitch = eachText(function (l, c) {
+        var o = opa(l);
+        twitch(l, c, { sp: 90, slide: 1, light: 1, sa: 80, la: 200, rgb: 50, spread: 0.2 }, [[0, 0, "in"], [1, 150]]);
+        animate(tr(l, "ADBE Opacity"), c, [[0.7, o, "hold"], [0.8, o * 0.3, "hold"], [0.88, o, "hold"], [0.95, 0]]);
+    }, 0.5, "out");
+
     // ================================================================ TEXT FX
 
-    var tfGlow = eachText(function (l) { deepGlow(l, 250, 1.2, null, null); });
+    function col4(k) { return [k[0], k[1], k[2], 1]; }
+
+    function tfGlowC(col) { return eachText(function (l) { deepGlow(l, 220, 0.55, null, null, col); }); }
+    function tfNeon(col) {
+        return eachText(function (l) {
+            deepGlow(l, 60, 0.7, null, null, col);
+            deepGlow(l, 380, 0.45, null, null, col);
+        });
+    }
+    function tfOutline(col) {
+        return eachText(function (l) {
+            var tp = l.property("ADBE Text Properties").property("ADBE Text Document"), d = tp.value;
+            d.applyFill = false;
+            d.applyStroke = true;
+            d.strokeColor = col;
+            d.strokeWidth = 3;
+            tp.setValue(d);
+            deepGlow(l, 200, 0.6, null, null, col);
+        });
+    }
+    // top colour to bottom colour over the text
+    function tfGrad(a, b) {
+        return eachText(function (l, c) {
+            var q = box(l, c.t0), fx = addFx(l, ["ADBE Ramp"]);
+            setP(fx, ["ADBE Ramp-0001"], [q.l + q.w / 2, q.t]);
+            setP(fx, ["ADBE Ramp-0002"], col4(a));
+            setP(fx, ["ADBE Ramp-0003"], [q.l + q.w / 2, q.t + q.h]);
+            setP(fx, ["ADBE Ramp-0004"], col4(b));
+        });
+    }
+    // rainbow across the text that travels sideways. dir 1 = to the right, -1 = to the left
+    function rainbowOn(l, c, dir) {
+        var q = box(l, Math.max(0, l.inPoint)), fx = addFx(l, ["ADBE Ramp"]);
+        setP(fx, ["ADBE Ramp-0001"], [q.l, q.t + q.h / 2]);
+        setP(fx, ["ADBE Ramp-0002"], [0, 0, 0, 1]);
+        setP(fx, ["ADBE Ramp-0003"], [q.l + q.w, q.t + q.h / 2]);
+        setP(fx, ["ADBE Ramp-0004"], [1, 1, 1, 1]);
+        var co = addFx(l, ["APC Colorama"]), lf = life(l, c);
+        animP(co, ["Phase Shift"], lf, [[0, 0], [1, -dir * 360 * Math.max(1, Math.round(lf.D / 2))]]);
+    }
+    function tfRainbowScroll(dir) {
+        return eachText(function (l, c) {
+            rainbowOn(l, c, dir);
+            deepGlow(l, 200, 0.35, null, null);
+        });
+    }
+
+    // textures: the effect fills the frame, Set Matte cuts it back to the letters
+    function matte(l) {
+        var fx = addFx(l, ["ADBE Set Matte3"]);
+        setP(fx, ["ADBE Set Matte3-0001"], l.index);
+    }
+    function noiseTex(l, c, col, contrast) {
+        var fx = addFx(l, ["ADBE Fractal Noise"]), lf = life(l, c);
+        setP(fx, ["Contrast"], contrast);
+        animP(fx, ["Evolution"], lf, [[0, 0], [1, 180 * Math.max(1, Math.round(lf.D))]]);
+        tintFx(l, [col[0] * 0.15, col[1] * 0.15, col[2] * 0.15, 1], col4(col), 100);
+    }
+    function tfPlasma(col) {
+        return eachText(function (l, c) {
+            var fx = addFx(l, ["S_TexturePlasma"], true);
+            if (fx) {
+                setP(fx, ["Noise Frequency"], 2.2);
+                setP(fx, ["Layers"], 3.5);
+                setP(fx, ["Phase Speed"], 0.8);
+                setP(fx, ["Glow Brightness"], 3);
+                setP(fx, ["Glow Color"], col4(col));
+            } else noiseTex(l, c, col, 220);
+            matte(l);
+            deepGlow(l, 200, 0.3, null, null, col);
+        });
+    }
+    function tfFlux(col) {
+        return eachText(function (l, c) {
+            var fx = addFx(l, ["S_TextureFlux"], true);
+            if (fx) {
+                setP(fx, ["Frequency"], 18);
+                setP(fx, ["Morph Speed"], 0.45);
+                setP(fx, ["Color0"], col4(col));
+            } else noiseTex(l, c, col, 140);
+            matte(l);
+            deepGlow(l, 200, 0.3, null, null, col);
+        });
+    }
+    var tfLoops = eachText(function (l) {
+        if (addFx(l, ["S_TextureLoops"])) matte(l);
+    });
+    var tfScan = eachText(function (l) {
+        var fx = addFx(l, ["ADBE Venetian Blinds"]);
+        setP(fx, ["ADBE Venetian Blinds-0001"], 35);
+        setP(fx, ["ADBE Venetian Blinds-0002"], 90);
+        setP(fx, ["ADBE Venetian Blinds-0003"], 6);
+        chroma(l, null, 0.15, null);
+    });
+    var tfBevel = eachText(function (l) {
+        var fx = addFx(l, ["ADBE Bevel Alpha"]);
+        setP(fx, ["ADBE Bevel Alpha-0001"], 4);
+        setP(fx, ["ADBE Bevel Alpha-0004"], 0.6);
+    });
+    var tfHalftone = eachText(function (l) { addFx(l, ["S_HalfTone"]); });
+
+    // real 3D needs Element: the panel links the text, you press Extrude in Scene Setup
+    function tfElement(comp, sel, c) {
+        var t = textLayers(comp, sel)[0];
+        var s = makeSolid(comp, [t], "Element 3D Text", [0, 0, 0], Math.max(0, t.inPoint), Math.max(c.fd, t.outPoint - Math.max(0, t.inPoint)));
+        var fx = addFx(s, ["VIDEOCOPILOT 3DArray"]);
+        if (!fx) return;
+        setP(fx, ["Path Layer 1"], t.index);
+        t.enabled = false;
+        log.push("now open Scene Setup in Element and press Extrude");
+    }
+
+    var tfGlow = eachText(function (l) { deepGlow(l, 220, 0.5, null, null); });
 
     var tfRays = eachText(function (l) {
         var fx = addFx(l, ["S_Rays", "CC Light Rays"]);
         if (!fx || fxIs(fx, "cc ")) return;
-        setP(fx, ["Threshold"], 0.2);
-        setP(fx, ["Rays Length"], 0.5);
-        setP(fx, ["Rays Brightness"], 5);
+        setP(fx, ["Threshold"], 0.5);
+        setP(fx, ["Rays Length"], 0.2);
+        setP(fx, ["Rays Brightness"], 1.2);
     });
 
     var tfRainbow = eachText(function (l) {
         addFx(l, ["ADBE 4ColorGradient"]);
-        deepGlow(l, 250, 1, null, null);
+        deepGlow(l, 220, 0.35, null, null);
     });
 
     // colours cycle for the whole layer, each letter bobs and tilts in turn, with glow
@@ -1452,14 +1807,14 @@
         hueKeys(l, { t0: c.t0, D: len, fd: c.fd }, [[0, 0], [1, 360 * Math.max(1, Math.round(len / 2))]]);
         wave(l, c, "Bob", [["ADBE Text Position 3D", [0, -30, 0]]], 1.1, 0, 38);
         wave(l, c, "Tilt", [["ADBE Text Rotation", 11]], 1.7, 0.4, 30);
-        deepGlow(l, 260, 1.1, null, null);
+        deepGlow(l, 240, 0.5, null, null);
     });
 
     var tfChroma = eachText(function (l) { chroma(l, null, 0.35, null); });
 
     var tfShake = eachText(function (l, c) {
         sShake(l, c, { freq: 12, x: 26, y: 26, tilt: 3 }, HIT(3));
-    });
+    }, 0.5, "at");
 
     var tf3DTilt = eachText(function (l) {
         l.threeDLayer = true;
@@ -1478,18 +1833,26 @@
         animator(l, c, "3D Flip", [["ADBE Text Rotation X", 90], ["ADBE Text Opacity", 0]], "out");
     }, 0.7);
 
-    // fake depth: a stack of hard shadows, one layer, no renderer change
-    var tf3DExtrude = eachText(function (l) {
-        for (var i = 1; i <= 10; i++) {
-            var fx = addFx(l, ["ADBE Drop Shadow"]);
-            if (!fx) break;
-            var g = 0.55 - i * 0.04;
-            setP(fx, ["ADBE Drop Shadow-0001"], [g, g, g, 1]);
+    // fake depth: 16 hard one-pixel steps in a darker shade of the text colour,
+    // then one soft shadow under it. one layer, no renderer change
+    var tf3DExtrude = eachText(function (l, c) {
+        var k = [1, 1, 1], i, fx;
+        try { k = l.property("ADBE Text Properties").property("ADBE Text Document").value.fillColor; } catch (e) {}
+        for (i = 1; i <= 16; i++) {
+            fx = addFx(l, ["ADBE Drop Shadow"]);
+            if (!fx) return;
+            var g = 0.5 - i * 0.015;
+            setP(fx, ["ADBE Drop Shadow-0001"], [k[0] * g, k[1] * g, k[2] * g, 1]);
             setP(fx, ["ADBE Drop Shadow-0002"], 255);
-            setP(fx, ["ADBE Drop Shadow-0003"], 135);
-            setP(fx, ["ADBE Drop Shadow-0004"], i * 1.5);
+            setP(fx, ["ADBE Drop Shadow-0003"], 150);
+            setP(fx, ["ADBE Drop Shadow-0004"], i * c.sc);
             setP(fx, ["ADBE Drop Shadow-0005"], 0);
         }
+        fx = addFx(l, ["ADBE Drop Shadow"]);
+        setP(fx, ["ADBE Drop Shadow-0002"], 150);
+        setP(fx, ["ADBE Drop Shadow-0003"], 150);
+        setP(fx, ["ADBE Drop Shadow-0004"], 26 * c.sc);
+        setP(fx, ["ADBE Drop Shadow-0005"], 40 * c.sc);
     });
 
     var tfMoBlur = eachText(function (l, c, comp) {
@@ -1506,7 +1869,7 @@
     function inFade(comp, sel, c) {
         var D = Math.max(c.D, 1);
         var s = makeSolid(comp, sel, "Fade In Start", [0, 0, 0], c.t0, D);
-        animate(tr(s, "ADBE Opacity"), { t0: c.t0, D: D, fd: c.fd }, [[0, 100, "coast"], [1, 0]]);
+        animate(tr(s, "ADBE Opacity"), { t0: c.t0, D: D, fd: c.fd }, [[0, 100, "soft"], [1, 0]]);
     }
     function inZoom(l, c) {
         geo(l, c, { s: [[0, 135, "out"], [1, 100]], mb: 180 });
@@ -1523,25 +1886,22 @@
         chroma(l, c, 0, SOFT(0.6));
     }
 
-    // random letters scramble into the title, with glow and a slight chroma hit
+    // letters rise out of a soft blur, light glow, stays readable
     function titleReveal(comp, sel, c) {
         var ls = [], i;
         for (i = 0; i < sel.length; i++) if (sel[i] instanceof TextLayer) ls.push(sel[i]);
         if (ls.length === 0) ls.push(newText(comp, TITLE_TXT, 110, comp.time, 4));
-        var cc = { t0: c.t0, D: Math.max(c.D, 1.2), fd: c.fd, sc: c.sc, comp: comp };
         for (i = 0; i < ls.length; i++) {
-            var l = ls[i];
-            animator(l, cc, "Scramble", [["ADBE Text Character Offset", 40]], "coast", 0);
-            animator(l, { t0: cc.t0, D: cc.D * 0.75, fd: cc.fd }, "Reveal", [["ADBE Text Opacity", 0]], "soft", 100);
-            chroma(l, cc, 0, SOFT(0.5));
-            deepGlow(l, 240, 0, cc, [[0, 2.2, "out"], [1, 0.7]]);
+            var l = ls[i], cc = { t0: Math.max(0, l.inPoint), D: Math.max(c.D, 1), fd: c.fd, sc: c.sc, comp: comp };
+            animator(l, cc, "Rise", [[T_POS, [0, 46, 0]], ["ADBE Text Blur", [14, 14]], [T_OP, 0]], "out");
+            deepGlow(l, 160, 0.2, null, null);
         }
     }
 
     function outFade(comp, sel, c) {
         var D = Math.max(c.D, 1);
         var s = makeSolid(comp, sel, "Fade Out End", [0, 0, 0], c.t0, Math.max(D, comp.duration - c.t0));
-        animate(tr(s, "ADBE Opacity"), { t0: c.t0, D: D, fd: c.fd }, [[0, 0, "in"], [1, 100]]);
+        animate(tr(s, "ADBE Opacity"), { t0: c.t0, D: D, fd: c.fd }, [[0, 0, "soft"], [1, 100]]);
     }
     function outZoom(l, c) {
         geo(l, c, { s: [[0, 100, "in"], [1, 118]], mb: 120 });
@@ -1556,7 +1916,7 @@
         slowStop(comp, sel, c);
         var D = lengthSeconds(comp, 1.5);
         var s = makeSolid(comp, sel, "Slow-Down Fade", [0, 0, 0], comp.time + D * 0.4, D * 0.6);
-        animate(tr(s, "ADBE Opacity"), { t0: comp.time + D * 0.4, D: D * 0.6, fd: c.fd }, [[0, 0, "in"], [1, 100]]);
+        animate(tr(s, "ADBE Opacity"), { t0: comp.time + D * 0.4, D: D * 0.6, fd: c.fd }, [[0, 0, "soft"], [1, 100]]);
     }
     function endCard(comp, sel, c) {
         var D = Math.max(lengthSeconds(comp, 3), 1.5);
@@ -1566,8 +1926,156 @@
         try { t.moveBefore(s); } catch (e) {}
         var cc = { t0: c.t0 + 0.3, D: 0.9, fd: c.fd, sc: c.sc, comp: comp };
         animator(t, cc, "Reveal", [["ADBE Text Opacity", 0], ["ADBE Text Position 3D", [0, 30, 0]]], "coast");
-        deepGlow(t, 240, 0.8, null, null);
+        deepGlow(t, 160, 0.2, null, null);
     }
+
+    // ================================================================ WATERMARKS
+    // CPVP Editing by zalii. Small text for the whole comp. Double-click it to type your name.
+
+    var WM_TXT = "your name";
+
+    function corner(t, comp, ax, ay) {
+        var r = t.sourceRectAtTime(0, false), m = comp.width * 0.025;
+        return [m + r.width / 2 + ax * (comp.width - 2 * m - r.width), m + r.height / 2 + ay * (comp.height - 2 * m - r.height)];
+    }
+
+    // ax / ay: 0 = left / top, 1 = right / bottom.  o = {size, op, f: extra(t, c, comp)}
+    function wm(ax, ay, o) {
+        return function (comp, sel, c) {
+            o = o || {};
+            var t = newText(comp, WM_TXT, (o.size || 40) * c.sc, 0, 0);
+            t.name = "Watermark";
+            tr(t, "ADBE Position").setValue(corner(t, comp, ax, ay));
+            tr(t, "ADBE Opacity").setValue(o.op || 45);
+            if (o.f) o.f(t, { t0: c.t0, D: c.D, fd: c.fd, sc: c.sc, comp: comp }, comp);
+        };
+    }
+
+    function straight(p) {
+        for (var k = 1; k <= p.numKeys; k++) { try { p.setSpatialTangentsAtKey(k, [0, 0, 0], [0, 0, 0]); } catch (e) {} }
+    }
+
+    // bounces off the edges for the whole comp
+    function wmBounce(t, c, comp) {
+        var r = t.sourceRectAtTime(0, false), hw = r.width / 2, hh = r.height / 2;
+        var x = comp.width * 0.3, y = comp.height * 0.4, vx = 150 * c.sc, vy = 100 * c.sc, tm = 0, n = 0;
+        var p = tr(t, "ADBE Position");
+        p.setValueAtTime(0, [x, y]);
+        while (tm < comp.duration && n < 300) {
+            var tx = (vx > 0) ? (comp.width - hw - x) / vx : (hw - x) / vx;
+            var ty = (vy > 0) ? (comp.height - hh - y) / vy : (hh - y) / vy;
+            var dt = Math.max(0.001, Math.min(tx, ty));
+            x += vx * dt; y += vy * dt; tm += dt;
+            if (tx <= ty) vx = -vx;
+            if (ty <= tx) vy = -vy;
+            p.setValueAtTime(tm, [x, y]);
+            n++;
+        }
+        straight(p);
+    }
+    function wmPulse(t, c) { loopKeys(tr(t, "ADBE Opacity"), life(t, c), 20, 55, 1.2); }
+    // jumps to the next corner every 4 seconds
+    function wmHop(t, c, comp) {
+        var p = tr(t, "ADBE Position"), cs = [[1, 1], [0, 1], [0, 0], [1, 0]], n = 0;
+        for (var tm = 0; tm < comp.duration && n < 200; tm += 4) {
+            p.setValueAtTime(tm, corner(t, comp, cs[n % 4][0], cs[n % 4][1]));
+            n++;
+        }
+        for (var k = 1; k <= p.numKeys; k++) p.setInterpolationTypeAtKey(k, KeyframeInterpolationType.HOLD, KeyframeInterpolationType.HOLD);
+    }
+    // crosses the bottom of the frame again and again
+    function wmTicker(t, c, comp) {
+        var r = t.sourceRectAtTime(0, false), y = corner(t, comp, 0, 1)[1], p = tr(t, "ADBE Position"), n = 0;
+        for (var tm = 0; tm < comp.duration && n < 100; tm += 8) {
+            p.setValueAtTime(tm, [comp.width + r.width, y]);
+            p.setValueAtTime(tm + 8 - c.fd, [-r.width, y]);
+            n++;
+        }
+        straight(p);
+    }
+    // the name repeated over the whole frame, tilted and very faint
+    function wmTiled(t, c, comp) {
+        var tp = t.property("ADBE Text Properties").property("ADBE Text Document"), d = tp.value, row = [], rows = [], i;
+        for (i = 0; i < 6; i++) row.push(WM_TXT);
+        for (i = 0; i < 9; i++) rows.push(row.join("        "));
+        d.text = rows.join("\r\r");
+        tp.setValue(d);
+        var r = t.sourceRectAtTime(0, false);
+        tr(t, "ADBE Anchor Point").setValue([r.left + r.width / 2, r.top + r.height / 2]);
+        tr(t, "ADBE Position").setValue([comp.width / 2, comp.height / 2]);
+        tr(t, "ADBE Rotate Z").setValue(-14);
+    }
+    function wmOutline(t) {
+        var tp = t.property("ADBE Text Properties").property("ADBE Text Document"), d = tp.value;
+        d.applyFill = false;
+        d.applyStroke = true;
+        d.strokeColor = [1, 1, 1];
+        d.strokeWidth = 1.5;
+        tp.setValue(d);
+    }
+    // shows for 3 seconds from the playhead
+    function wmPop(t, c) {
+        t.inPoint = c.t0;
+        t.outPoint = Math.min(c.comp.duration, c.t0 + 3);
+        animate(tr(t, "ADBE Opacity"), { t0: c.t0, D: t.outPoint - c.t0 - c.fd, fd: c.fd }, [[0, 0, "soft"], [0.15, 60, "soft"], [0.85, 60, "soft"], [1, 0]]);
+    }
+
+    // ================================================================ AUDIO (selected layers)
+    // CPVP Editing by zalii
+
+    function audio(fn) {
+        return function (comp, sel, c) {
+            var n = 0;
+            for (var i = 0; i < sel.length; i++) {
+                if (!sel[i].hasAudio) continue;
+                n++;
+                try { fn(sel[i], c, comp); } catch (e) { log.push(sel[i].name + ": " + e.toString()); }
+            }
+            if (n === 0) warn("Select the layer with the sound.");
+        };
+    }
+    function levels(l) { return l.property("ADBE Audio Group").property("ADBE Audio Levels"); }
+
+    var QUIET = [-60, -60];
+    var auFadeIn = audio(function (l, c) {
+        var p = levels(l);
+        animate(p, c, [[0, QUIET, "soft"], [1, p.value]]);
+    });
+    var auFadeOut = audio(function (l, c) {
+        var p = levels(l);
+        animate(p, c, [[0, p.value, "soft"], [1, QUIET]]);
+    });
+    // dips around the playhead and comes back
+    var auDuck = audio(function (l, c) {
+        var p = levels(l), v = p.value, cc = { t0: Math.max(0, c.t0 - c.D / 2), D: c.D, fd: c.fd };
+        animate(p, cc, [[0, v, "soft"], [0.25, [v[0] - 14, v[1] - 14], "soft"], [0.75, [v[0] - 14, v[1] - 14], "soft"], [1, v]]);
+    });
+    function auGain(db) {
+        return audio(function (l) {
+            var p = levels(l), v = p.value;
+            if (p.numKeys > 0) { log.push(l.name + ": levels already have keys, left alone"); return; }
+            p.setValue([v[0] + db, v[1] + db]);
+        });
+    }
+    function lowPass(l) {
+        var fx = addFx(l, ["ADBE Aud HiLo"]);
+        setP(fx, ["Filter Options", "ADBE Aud HiLo-0001"], 2);
+        return fx;
+    }
+    var auMuffle = audio(function (l) { setP(lowPass(l), ["Cutoff Frequency", "ADBE Aud HiLo-0002"], 600); });
+    // clear > muffled, starting on the playhead
+    var auMuffleIn = audio(function (l, c) {
+        animP(lowPass(l), ["Cutoff Frequency", "ADBE Aud HiLo-0002"], c, [[0, 16000, "out"], [1, 500]]);
+    });
+    // muffled until the playhead, then it opens up: park the playhead on the drop
+    var auMuffleDrop = audio(function (l, c) {
+        var t0 = Math.max(0, c.t0 - c.D);
+        animP(lowPass(l), ["Cutoff Frequency", "ADBE Aud HiLo-0002"], { t0: t0, D: c.t0 - t0, fd: c.fd }, [[0, 450, "rush"], [1, 16000]]);
+    });
+    var auBass = audio(function (l) { setP(addFx(l, ["ADBE Aud BT"]), ["Bass", "ADBE Aud BT-0001"], 9); });
+    var auTreble = audio(function (l) { setP(addFx(l, ["ADBE Aud BT"]), ["Treble", "ADBE Aud BT-0002"], 8); });
+    var auReverb = audio(function (l) { addFx(l, ["ADBE Aud Reverb"]); });
+    var auEcho = audio(function (l) { addFx(l, ["ADBE Aud Delay"]); });
 
     // ================================================================ TOOLS
 
@@ -1649,7 +2157,7 @@
     var GROUPS = [
         ["Shakes", [
             P("Heavy Hit", "hit", stack({ sh: { amp: 5, freq: 12, x: 34, y: 26, z: 0.1, tilt: 2.5 }, zb: 0.35, ch: 0.6, gl: [300, 1.5] }), "Big stacked hit: shake, zoom blur, chroma and glow.", { len: 0.55 }),
-            P("Mega Hit", "hit", stack({ geo: 172, sh: { amp: 8, freq: 14, x: 40, y: 46, z: 0.15, tilt: 5, rgb: 0.6 }, tw: TW_HIT, ch: 1, gl: [420, 2.4], ex: 2.2 }), "The biggest one: hard shake, zoom punch, twitch, flash and glow.", { len: 0.7 }),
+            P("Mega Hit", "hit", stack({ mo: 0.8, sh: { amp: 6.5, freq: 13, x: 36, y: 40, z: 0.1, tilt: 3 }, tw: { a: 90, sp: 80, blur: 1, slide: 1, sa: 45, ba: 60 }, zb: 0.3, ch: 0.8, gl: [280, 0.6], ex: 0.5 }), "The biggest one: hard shake, zoom punch, twitch, flash and glow.", { len: 0.6 }),
             P("Impact", "hit", stack({ sh: { amp: 6.5, freq: 10, x: 22, y: 64, tilt: 3.5, mb: 1 }, tw: { a: 90, sp: 80, slide: 1, sa: 50 }, ex: 0.9 }), "Hard impact shake that slams on frame one and settles.", { len: 0.5 }),
             P("Impact Punch", "hit", stack({ mo: 0.78, sh: { amp: 4.5, freq: 12, x: 30, y: 30, z: 0.1, tilt: 3 } }), "Shake with a quick zoom punch.", { len: 0.45 }),
             P("Impact Zoom Shake", "hit", stack({ geo: 180, sh: { amp: 6, freq: 12, x: 30, y: 52, tilt: 4 }, zb: 0.3, ch: 0.7, gl: [320, 1.4] }), "Full shake with a 180% zoom punch, blur, chroma and glow.", { len: 0.6 }),
@@ -1686,18 +2194,29 @@
             P("Twitch RGB", "hit", stack({ tw: TW_SLIDE, ch: 0.8 }), "Twitch slide with RGB split.", { len: 0.4, req: R_TW }),
             P("Glitch Shake", "hit", function (l, c) { stack({ sh: { amp: 3.5, freq: 20, x: 46, y: 10, tilt: 1 }, tw: TW_SLIDE })(l, c); glitch(l, c); }, "Shake with digital damage.", { len: 0.45 })
         ]],
-        ["Beat Pumps", [
-            P("Beat Pump", "hit", stack({ mo: 0.92, gl: [220, 0.5], env: SOFT }), "Clean zoom pump with glow, no rattle.", { len: 0.4 }),
-            P("Beat Pump Soft", "hit", stack({ mo: 0.96, gl: [200, 0.3], env: SOFT }), "Barely there pump for quiet beats.", { len: 0.45 }),
-            P("Beat Pump Hard", "hit", stack({ mo: 0.84, gl: [280, 0.9] }), "Strong pump for the loud beats.", { len: 0.4 }),
-            P("Punch Pump", "hit", stack({ geo: 125, gl: [240, 0.6] }), "Scale pump from 125% without motion blur streaks.", { len: 0.4 }),
-            P("Glow Pump", "hit", stack({ mo: 0.95, gl: [380, 1.6], env: SOFT }), "Small pump, big glow.", { len: 0.45 }),
-            P("Chroma Pump", "hit", stack({ mo: 0.92, ch: 0.8, env: SOFT }), "Pump with a chroma pulse.", { len: 0.4 }),
-            P("Flash Pump", "hit", stack({ mo: 0.9, ex: 1.2, gl: [300, 0.8] }), "Pump with a quick exposure flash.", { len: 0.4 }),
-            P("Bass Pump", "hit", stack({ mo: 0.88, gl: [260, 0.7], env: function (v) { return [[0, v, "coast"], [1, 0]]; } }), "Slower, heavier pump for bass hits.", { len: 0.7 }),
-            P("Double Pump", "hit", stack({ mo: 0.9, gl: [240, 0.6], env: DOUBLE }), "Two pumps in a row.", { len: 0.6 }),
-            P("Blur Pump", "hit", stack({ mo: 0.93, zb: 0.25, env: SOFT }), "Pump with a zoom blur pulse.", { len: 0.4 }),
-            P("Tilt Pump", "hit", function (l, c) { moCurves(l, c, [[0, 0.92, "out"], [1, 1]], [[0, 3, "out"], [1, 0]], null, null); }, "Pump with a small tilt.", { len: 0.45 })
+        ["Beat Shakes", [
+            P("Beat Shake", "hit", stack({ mo: 0.92, sh: { amp: 1.4, freq: 14, x: 16, y: 14, tilt: 0.6 }, gl: [220, 0.3], env: SOFT }), "Clean zoom shake for the beat.", { len: 0.4 }),
+            P("Beat Shake Soft", "hit", stack({ mo: 0.96, sh: { amp: 0.8, freq: 12, x: 12, y: 12, tilt: 0.4 }, env: SOFT }), "Barely there, for quiet beats.", { len: 0.45 }),
+            P("Beat Shake Hard", "hit", stack({ mo: 0.84, sh: { amp: 2.2, freq: 14, x: 20, y: 20, tilt: 1 }, gl: [280, 0.5] }), "Stronger, for the loud beats.", { len: 0.4 }),
+            P("Punch Shake", "hit", stack({ geo: 125, sh: { amp: 1.4, freq: 14, x: 16, y: 14, tilt: 0.6 } }), "Scale punch from 125% with a small shake.", { len: 0.4 }),
+            P("Glow Shake", "hit", stack({ mo: 0.95, sh: { amp: 1.2, freq: 14, x: 14, y: 14, tilt: 0.5 }, gl: [380, 1], env: SOFT }), "Small shake, big glow.", { len: 0.45 }),
+            P("Chroma Shake", "hit", stack({ mo: 0.92, sh: { amp: 1.4, freq: 14, x: 16, y: 14, tilt: 0.6 }, ch: 0.8, env: SOFT }), "Shake with a chroma pulse.", { len: 0.4 }),
+            P("Flash Shake", "hit", stack({ mo: 0.9, sh: { amp: 1.6, freq: 14, x: 16, y: 16, tilt: 0.6 }, ex: 1.1, gl: [300, 0.5] }), "Shake with a quick exposure flash.", { len: 0.4 }),
+            P("Bass Shake", "hit", stack({ mo: 0.88, sh: { amp: 1.8, freq: 7, x: 14, y: 24, tilt: 0.6 }, env: function (v) { return [[0, v, "coast"], [1, 0]]; } }), "Slower, heavier shake for bass hits.", { len: 0.7 }),
+            P("Double Shake", "hit", stack({ mo: 0.9, sh: { amp: 1.6, freq: 14, x: 16, y: 16, tilt: 0.6 }, env: DOUBLE }), "Two beat shakes in a row.", { len: 0.6 }),
+            P("Blur Shake", "hit", stack({ mo: 0.93, sh: { amp: 1.4, freq: 14, x: 16, y: 14, tilt: 0.6 }, zb: 0.25, env: SOFT }), "Shake with a zoom blur pulse.", { len: 0.4 }),
+            P("Tilt Shake", "hit", function (l, c) { mirror(l); moCurves(l, c, [[0, 0.92, "out"], [1, 1]], [[0, 3, "out"], [1, 0]], null, null); sShake(l, c, { freq: 14, x: 14, y: 12, tilt: 1 }, SOFT(1.2)); }, "Shake with a small tilt.", { len: 0.45 })
+        ]],
+        ["CPVP", [
+            P("Totem Pop", "self", combo("Totem Pop", { mo: 0.9, sh: { amp: 3.5, freq: 14, x: 26, y: 30, tilt: 2 }, gl: [240, 0.4] }, [1, 0.82, 0.2], 34), "Gold flash and a pop shake for totem pops.", { len: 0.5 }),
+            P("Crystal Blast", "self", combo("Crystal Blast", { geo: 130, sh: { amp: 5.5, freq: 16, x: 30, y: 30, tilt: 4, rgb: 0.6 }, ch: 0.9, gl: [260, 0.4] }, [1, 0.3, 0.85], 36), "Pink flash, zoom punch and rattle for crystal hits.", { len: 0.5 }),
+            P("Anchor Boom", "self", combo("Anchor Boom", { mo: 0.78, sh: { amp: 7, freq: 10, x: 24, y: 60, tilt: 3 }, wv: { fx: "puff", a: 0.4 }, ch: 0.6 }, [1, 0.5, 0.1], 38), "Orange flash, heavy drop and lens puff for anchor kills.", { len: 0.6 }),
+            P("Kill Shot", "self", combo("Kill Shot", { geo: 140, sh: { amp: 6, freq: 12, x: 30, y: 44, tilt: 3 }, zb: 0.35, ch: 0.8, gl: [280, 0.5] }, [1, 1, 1], 42), "White flash and a full hit for the final kill.", { len: 0.6 }),
+            P("Shield Break", "self", combo("Shield Break", { sh: { amp: 4, freq: 20, x: 44, y: 10, tilt: 1 }, tw: TW_SLIDE, ch: 0.7 }, [0.3, 0.6, 1], 30), "Blue flash and a side rattle for shield breaks.", { len: 0.4 }),
+            P("Pearl Swap", "self", combo("Pearl Swap", { mo: 1.2, zb: 0.4, ch: 0.5 }, [0.2, 1, 0.7], 24), "Teal flash and a zoom snap for pearls.", { len: 0.4 }),
+            P("Combo Rattle", "self", combo("Combo Rattle", { sh: { amp: 3, freq: 22, x: 36, y: 20, tilt: 1.5 }, env: TRIPLE }), "Three fast taps for a hit combo.", { len: 0.7 }),
+            P("Rainbow Anchor", "look", rainbowLoop, "Colours keep cycling: trim or mask the layer over the anchor, crystal or totem.", { lin: 1 }),
+            P("Rainbow Hit", "hit", function (l, c) { stack({ mo: 0.9, sh: { amp: 3, freq: 14, x: 24, y: 24, tilt: 2 }, gl: [280, 0.6] })(l, c); hueKeys(l, c, [[0, 0], [1, 360]]); }, "Hit that runs through the rainbow once.", { len: 0.6, lin: 1 })
         ]],
         ["Build-Up", [
             P("Full Build-Up", "pre", buFull, "Push in, rising shake, chroma and glow into the drop.", { len: 1.5 }),
@@ -1708,9 +2227,9 @@
             P("Riser Blur", "pre", buBlur, "Zoom blur building up.", { len: 1.2 }),
             P("Flicker Build", "pre", buFlicker, "Flicker that gets stronger.", { len: 1.2, lin: 1 }),
             P("Tension Zoom", "pre", buTension, "Push in while the edges close in.", { len: 2 }),
-            P("Heartbeat Pumps", "pre", buHeart, "Pumps that get closer together until the drop.", { len: 2 }),
+            P("Heartbeat Shakes", "pre", buHeart, "Beats that get closer together until the drop.", { len: 2 }),
             P("Twitch Build", "pre", buTwitch, "Twitching that ramps up.", { len: 1.2, req: R_TW }),
-            P("Speed-Up Ramp", "self", ramp("into", 1.6, 9, 90, 1, true), "Selected clip: slow, then races into the drop.", { len: 1 })
+            P("Slow Into Kill", "self", leadIn, "Selected clip: goes into slow motion right on the playhead. Park it on the kill.", { len: 1 })
         ]],
         ["Transitions", [
             P("Spin Right", "trans", spin(1), "Full spin over the cut, slow-fast-slow.", { len: 0.8 }),
@@ -1743,8 +2262,8 @@
             P("Threshold Flash", "self", thresholdFlash, "Three frames of black and white.", { lin: 1 }),
             P("Black Strobe", "self", blackStrobe, "Black frames strobing.", { lin: 1 }),
             P("Dip to Black", "self", dipBlack, "Dips to black around the playhead.", { len: 0.5 }),
-            P("Fade In", "self", fade("Fade In", 100, 0, "coast"), "Fade in from black.", { len: 0.6 }),
-            P("Fade Out", "self", fade("Fade Out", 0, 100, "in"), "Fade out to black.", { len: 0.6 })
+            P("Fade In", "self", fade("Fade In", 100, 0), "Fade in from black.", { len: 0.6 }),
+            P("Fade Out", "self", fade("Fade Out", 0, 100), "Fade out to black and stay black.", { len: 0.6 })
         ]],
         ["Light + Glow", [
             P("Rays Burst", "hit", raysBurst, "Light rays bursting out and fading.", { len: 0.5 }),
@@ -1752,6 +2271,8 @@
             P("Edge Rays", "look", edgeRays, "Rays from the edges of things."),
             P("Glow Pulse", "hit", glowPulse, "Glow burst that fades.", { len: 0.5 }),
             P("Soft Glow", "look", softGlow, "Light steady glow."),
+            P("Glow Flicker", "self", flicker, "Makes the glow on the selected layer flicker. Nothing selected: new flickering glow layer.", { lin: 1 }),
+            P("Light Sweep", "hit", sweepHit, "Bar of light sweeping across.", { len: 0.8 }),
             P("Rainbow Glow", "hit", rainbowGlow, "Rainbow glow with a hue cycle.", { len: 1, lin: 1 }),
             P("Glint Sparkle", "look", fxGlint, "Star glints on bright spots.", { req: ["S_Glint", "S_GlintRainbow", "S_Sparkles"] }),
             P("KiraKira Sparkle", "look", fxKira, "Anime style sparkle streaks.", { req: ["OLM OLM Kira Kira", "S_Glint"] }),
@@ -1763,7 +2284,10 @@
             P("Lightning", "hit", fxLightning, "Lightning bolt.", { lin: 1 })
         ]],
         ["FX", [
-            P("Blur Names", "self", blurNames, "Mosaic patch to drag over a nametag, chat or scoreboard.", { lin: 1 }),
+            P("Blur Names", "self", patch("Blur Names", 0.38, 0.455, 0.62, 0.545), "Mosaic square to move over a nametag. Resize it under Contents > Square.", { lin: 1 }),
+            P("Blur Chat", "self", patch("Blur Chat", 0, 0.58, 0.36, 0.93), "Mosaic over the chat, bottom left.", { lin: 1 }),
+            P("Blur Scoreboard", "self", patch("Blur Scoreboard", 0.84, 0.36, 1, 0.64), "Mosaic over the scoreboard, right side.", { lin: 1 }),
+            P("Drop Shadow", "self", dropShadow, "zalii's drop shadow on the selected layers.", { lin: 1 }),
             P("Chroma Hit", "hit", chromaHit, "Colours split and snap back.", { len: 0.45, req: R_CH }),
             P("Zoom Blur Hit", "hit", zoomBlurHit, "Zoom blur burst.", { len: 0.45 }),
             P("Glitch", "hit", glitch, "Digital damage burst.", { len: 0.4, req: ["S_DigitalDamage", "BCC_VIDEOGLITCH", "S_WarpChroma"] }),
@@ -1787,6 +2311,8 @@
             P("Teal Moody", "look", ccTealMoody, "Dark teal."),
             P("Pink Bloom", "look", ccPinkBloom, "Warm pink haze."),
             P("Crystal Pink", "look", ccCrystal, "Punchy magenta, sharp, light glow."),
+            P("Light Blue", "look", ccLightBlue, "Clean light blue."),
+            P("Pink", "look", ccPink, "Clean pink."),
             P("Gold Hour", "look", ccGoldHour, "Warm gold."),
             P("Dark Punch", "look", ccDarkPunch, "Dark and contrasty."),
             P("Vibrant Pop", "look", ccVibrant, "Saturated and sharp."),
@@ -1799,21 +2325,30 @@
             P("Magic Bullet Looks", "look", ccMagicBullet, "Adds Looks so you can pick a look yourself.", { req: ["MB LookSuite3"] })
         ]],
         ["Time Remap", [
-            P("Kill Ramp", "self", ramp("kill", 1, 9, 90, 1), "Selected clip: instantly fast, then slows right down.", { len: 1 }),
-            P("Kill Ramp Hard", "self", ramp("kill", 1.6, 11, 94, 1), "Faster burst, longer slow landing.", { len: 1 }),
-            P("Kill Ramp Soft", "self", ramp("kill", 1, 5, 80, 1), "Gentler version.", { len: 1 }),
-            P("Double Ramp", "self", ramp("kill", 1, 9, 90, 2), "Two kill ramps in the length.", { len: 1 }),
-            P("Triple Ramp", "self", ramp("kill", 1, 9, 90, 3), "Three kill ramps in the length.", { len: 1 }),
-            P("Into Hit (slow > fast)", "self", ramp("into", 1, 9, 90, 1), "Slow, then snaps fast at the end.", { len: 1 }),
+            P("Kill Ramp", "self", killRamp("norm", 1), "Selected clip: bursts fast on the playhead, dips into slow motion, back to normal.", { len: 1 }),
+            P("Kill Ramp Hard", "self", killRamp("hard", 1), "Bigger burst, deeper slow motion.", { len: 1 }),
+            P("Kill Ramp Soft", "self", killRamp("soft", 1), "Gentler version.", { len: 1 }),
+            P("Slow Into Kill", "self", leadIn, "Goes into slow motion right on the playhead. Park it on the kill.", { len: 1 }),
+            P("Build + Kill Ramp", "self", leadKill, "Slow motion into the kill, then the kill ramp out of it. Park the playhead on the kill.", { len: 1 }),
+            P("Double Ramp", "self", killRamp("norm", 2), "Two kill ramps in the length.", { len: 1 }),
+            P("Triple Ramp", "self", killRamp("norm", 3), "Three kill ramps in the length.", { len: 1 }),
             P("Slow-Mo (25%)", "self", speedChange(0.25), "Quarter speed for the length.", { len: 1 }),
             P("Slow-Mo (50%)", "self", speedChange(0.5), "Half speed for the length.", { len: 1 }),
             P("Freeze Frame", "self", speedChange(0), "Freezes for the length.", { len: 1 })
         ]],
-        ["Beats", [
-            P("Beat Markers (main hits)", "self", beatMarkers(1.6), "Markers on the hardest hits of the selected song.", { lin: 1 }),
-            P("Beat Markers (normal)", "self", beatMarkers(0.8), "Markers on most beats.", { lin: 1 }),
-            P("Beat Markers (every hit)", "self", beatMarkers(0.2), "Markers on every small hit.", { lin: 1 }),
-            P("Clear Markers", "self", clearMarkers, "Removes the markers from the selected layers.", { lin: 1 })
+        ["Audio", [
+            P("Fade In", "self", auFadeIn, "Selected sound fades in from the playhead.", { len: 1 }),
+            P("Fade Out", "self", auFadeOut, "Selected sound fades out from the playhead.", { len: 1 }),
+            P("Muffle", "self", auMuffle, "Low pass: sounds like it is behind a wall.", { lin: 1 }),
+            P("Muffle In", "self", auMuffleIn, "Goes from clear to muffled.", { len: 1 }),
+            P("Muffle Until Drop", "self", auMuffleDrop, "Muffled, then opens up on the playhead. Park it on the drop.", { len: 2 }),
+            P("Duck", "self", auDuck, "Volume dips around the playhead and comes back.", { len: 1.5 }),
+            P("Quieter (-6 dB)", "self", auGain(-6), "Turns the sound down.", { lin: 1 }),
+            P("Louder (+3 dB)", "self", auGain(3), "Turns the sound up.", { lin: 1 }),
+            P("Bass Boost", "self", auBass, "More bass.", { lin: 1 }),
+            P("Treble Boost", "self", auTreble, "More treble.", { lin: 1 }),
+            P("Reverb", "self", auReverb, "Room reverb.", { lin: 1 }),
+            P("Echo", "self", auEcho, "Delay echo.", { lin: 1 })
         ]],
         ["Text", [
             P("Typewriter", "self", txTypewriter, "Letters appear one by one.", { len: 0.6 }),
@@ -1826,10 +2361,68 @@
             P("Flicker In", "self", txFlicker, "Flickers on like a bad light.", { len: 0.5, lin: 1 }),
             P("Tracking In", "self", txTracking, "Letters close in from wide spacing.", { len: 0.8 }),
             P("Glitch In", "self", txGlitchIn, "Twitches in.", { len: 0.5, req: R_TW }),
-            P("Wavy", "self", txWavy, "A wave keeps running through the letters.", { lin: 1 })
+            P("Slide Down", "self", txSlideDown, "Letters slide down into place.", { len: 0.6 }),
+            P("Slide Left", "self", txSlideLeft, "Letters slide in from the right.", { len: 0.6 }),
+            P("Slide Right", "self", txSlideRight, "Letters slide in from the left.", { len: 0.6 }),
+            P("Scale In", "self", txScaleIn, "Letters grow from nothing.", { len: 0.6 }),
+            P("Spin In", "self", txSpinIn, "Letters spin into place.", { len: 0.7 }),
+            P("Stretch In", "self", txStretch, "Letters squash down from tall.", { len: 0.6 }),
+            P("Skew In", "self", txSkew, "Letters lean in.", { len: 0.6 }),
+            P("Bounce In", "self", txBounce, "Whole text bounces in.", { len: 0.6 }),
+            P("Fade In", "self", txFade, "Plain fade in.", { len: 0.6 }),
+            P("Wavy", "self", txWavy, "A wave keeps running through the letters.", { lin: 1 }),
+            P("Pulse", "self", txPulse, "Text keeps pulsing.", { lin: 1 }),
+            P("Float", "self", txFloat, "Text drifts up and down.", { lin: 1 }),
+            P("Pan Right", "self", txPan(1), "Slow drift to the right for the whole layer.", { lin: 1 }),
+            P("Pan Left", "self", txPan(-1), "Slow drift to the left for the whole layer.", { lin: 1 }),
+            P("Light Sweep", "self", txSweep, "Bar of light runs over the text, from the playhead.", { len: 0.8 })
+        ]],
+        ["Text Out", [
+            P("Fade Out", "self", txoFade, "Plain fade out at the end of the text layer.", { len: 0.6 }),
+            P("Typewriter Out", "self", txoType, "Letters disappear one by one.", { len: 0.6 }),
+            P("Slide Out", "self", txoSlide, "Letters slide down and out.", { len: 0.6 }),
+            P("Drop Out", "self", txoDrop, "Letters fall out.", { len: 0.6 }),
+            P("Blur Out", "self", txoBlur, "Letters blur away.", { len: 0.7 }),
+            P("Scramble Out", "self", txoScramble, "Letters scramble and vanish.", { len: 0.7 }),
+            P("Scale Out", "self", txoScale, "Letters shrink to nothing.", { len: 0.6 }),
+            P("Pop Out", "self", txoPop, "Whole text blows up and fades.", { len: 0.5 }),
+            P("Shrink Out", "self", txoShrink, "Whole text shrinks away.", { len: 0.5 }),
+            P("Tracking Out", "self", txoTracking, "Letters spread apart and fade.", { len: 0.8 }),
+            P("Flicker Out", "self", txoFlicker, "Flickers off.", { len: 0.5, lin: 1 }),
+            P("Glitch Out", "self", txoGlitch, "Twitches out.", { len: 0.5, req: R_TW })
         ]],
         ["Text FX", [
-            P("Glow", "self", tfGlow, "Glow on the text.", { lin: 1 }),
+            P("Glow", "self", tfGlow, "Soft white glow.", { lin: 1 }),
+            P("Glow Pink", "self", tfGlowC([1, 0.3, 0.75]), "Pink glow.", { lin: 1 }),
+            P("Glow Blue", "self", tfGlowC([0.2, 0.5, 1]), "Blue glow.", { lin: 1 }),
+            P("Glow Light Blue", "self", tfGlowC([0.4, 0.85, 1]), "Light blue glow.", { lin: 1 }),
+            P("Glow Purple", "self", tfGlowC([0.6, 0.25, 1]), "Purple glow.", { lin: 1 }),
+            P("Glow Red", "self", tfGlowC([1, 0.1, 0.15]), "Red glow.", { lin: 1 }),
+            P("Glow Gold", "self", tfGlowC([1, 0.75, 0.2]), "Gold glow.", { lin: 1 }),
+            P("Glow Green", "self", tfGlowC([0.2, 1, 0.4]), "Green glow.", { lin: 1 }),
+            P("Glow Flicker", "self", txGlowFlicker, "The glow on the text flickers.", { lin: 1 }),
+            P("Neon Pink", "self", tfNeon([1, 0.25, 0.75]), "Tight and wide pink glow, like a neon sign.", { lin: 1 }),
+            P("Neon Blue", "self", tfNeon([0.25, 0.6, 1]), "Neon sign in blue.", { lin: 1 }),
+            P("Outline Glow", "self", tfOutline([1, 1, 1]), "Outline only, glowing.", { lin: 1 }),
+            P("Outline Glow Pink", "self", tfOutline([1, 0.3, 0.75]), "Pink glowing outline.", { lin: 1 }),
+            P("Gradient Blue", "self", tfGrad([0.55, 0.9, 1], [0.1, 0.3, 1]), "Light blue to deep blue.", { lin: 1 }),
+            P("Gradient Pink", "self", tfGrad([1, 0.6, 0.85], [0.6, 0.15, 1]), "Pink to purple.", { lin: 1 }),
+            P("Gradient Gold", "self", tfGrad([1, 0.95, 0.5], [1, 0.5, 0.05]), "Yellow to orange.", { lin: 1 }),
+            P("Gradient Red", "self", tfGrad([1, 0.4, 0.3], [0.5, 0, 0.05]), "Red to dark red.", { lin: 1 }),
+            P("Gradient Green", "self", tfGrad([0.7, 1, 0.5], [0, 0.6, 0.3]), "Lime to green.", { lin: 1 }),
+            P("Plasma Pink", "self", tfPlasma([1, 0.2, 0.8]), "Moving plasma inside the letters.", { lin: 1 }),
+            P("Plasma Blue", "self", tfPlasma([0.2, 0.5, 1]), "Blue plasma.", { lin: 1 }),
+            P("Plasma Green", "self", tfPlasma([0.2, 1, 0.45]), "Green plasma.", { lin: 1 }),
+            P("Plasma Purple", "self", tfPlasma([0.6, 0.25, 1]), "Purple plasma.", { lin: 1 }),
+            P("Flux Blue", "self", tfFlux([0.1, 0.4, 1]), "Flowing flux texture inside the letters.", { lin: 1 }),
+            P("Flux Red", "self", tfFlux([1, 0.1, 0.2]), "Red flux.", { lin: 1 }),
+            P("Loops Texture", "self", tfLoops, "Looping line texture inside the letters.", { lin: 1, req: ["S_TextureLoops"] }),
+            P("Scanlines", "self", tfScan, "Scanlines with a little chroma.", { lin: 1 }),
+            P("Bevel", "self", tfBevel, "Bevelled edges.", { lin: 1 }),
+            P("Halftone", "self", tfHalftone, "Comic dots in the letters.", { lin: 1, req: ["S_HalfTone"] }),
+            P("Drop Shadow", "self", function (comp, sel) { dropShadow(comp, textLayers(comp, sel)); }, "zalii's drop shadow.", { lin: 1 }),
+            P("Rainbow Scroll Right", "self", tfRainbowScroll(1), "Rainbow that travels to the right through the text.", { lin: 1 }),
+            P("Rainbow Scroll Left", "self", tfRainbowScroll(-1), "Rainbow that travels to the left.", { lin: 1 }),
             P("Light Rays", "self", tfRays, "Rays from the text.", { lin: 1 }),
             P("Rainbow", "self", tfRainbow, "Rainbow gradient with glow.", { lin: 1 }),
             P("Rainbow Wave", "self", tfRainbowWave, "Colours cycle, letters bob and tilt, with glow.", { lin: 1 }),
@@ -1838,7 +2431,8 @@
             P("3D Tilt", "self", tf3DTilt, "Tilts the text in 3D.", { lin: 1 }),
             P("3D Swing", "self", tf3DSwing, "Text swings side to side in 3D.", { len: 2 }),
             P("3D Flip In", "self", tf3DFlip, "Letters flip up into place.", { len: 0.7 }),
-            P("3D Extrude", "self", tf3DExtrude, "Fake depth from stacked shadows.", { lin: 1 }),
+            P("3D Extrude", "self", tf3DExtrude, "Solid depth behind the letters in a darker shade of the text colour.", { lin: 1 }),
+            P("3D Text (Element)", "self", tfElement, "Links the text into Element 3D. Then open Scene Setup and press Extrude.", { lin: 1, req: ["VIDEOCOPILOT 3DArray"] }),
             P("Motion Blur On", "self", tfMoBlur, "Turns on motion blur for the text.", { lin: 1 })
         ]],
         ["Intros + Outros", [
@@ -1846,14 +2440,38 @@
             P("Zoom In Start", "hit", inZoom, "Opens zoomed and blurred, lands sharp.", { len: 1 }),
             P("Blur In Start", "hit", inBlur, "Opens out of a blur.", { len: 1 }),
             P("Flash In Start", "hit", inFlash, "Opens out of a white flash.", { len: 0.8 }),
-            P("Title Reveal", "self", titleReveal, "Random letters scramble into your title, with glow and chroma.", { len: 1.2 }),
+            P("Title Reveal", "self", titleReveal, "Letters rise out of a soft blur. Clean and readable.", { len: 1 }),
             P("Fade Out End", "self", outFade, "Closes to black and stays black.", { len: 1 }),
             P("Zoom Out End", "hit", outZoom, "Pushes in, blurs and darkens to the end.", { len: 1.5 }),
             P("Blur Out End", "hit", outBlur, "Blurs away to black.", { len: 1.2 }),
             P("Slow-Down Ending", "self", outSlow, "Selected clip slows to a stop and fades out.", { len: 1.5 }),
             P("End Card", "self", endCard, "Dark card with a closing line.", { len: 3 })
         ]],
+        ["Watermarks", [
+            P("Bottom Right", "self", wm(1, 1), "Small watermark, bottom right.", { lin: 1 }),
+            P("Bottom Left", "self", wm(0, 1), "Bottom left.", { lin: 1 }),
+            P("Top Right", "self", wm(1, 0), "Top right.", { lin: 1 }),
+            P("Top Left", "self", wm(0, 0), "Top left.", { lin: 1 }),
+            P("Bottom Center", "self", wm(0.5, 1), "Bottom middle.", { lin: 1 }),
+            P("Top Center", "self", wm(0.5, 0), "Top middle.", { lin: 1 }),
+            P("Center Ghost", "self", wm(0.5, 0.5, { size: 150, op: 10 }), "Big and barely visible in the middle.", { lin: 1 }),
+            P("Glow", "self", wm(1, 1, { op: 70, f: function (t) { deepGlow(t, 160, 0.4, null, null); } }), "Bottom right with a soft glow.", { lin: 1 }),
+            P("Glow Pink", "self", wm(1, 1, { op: 80, f: function (t) { deepGlow(t, 160, 0.5, null, null, [1, 0.3, 0.75]); } }), "Bottom right with a pink glow.", { lin: 1 }),
+            P("Rainbow", "self", wm(1, 1, { op: 80, f: function (t, c) { rainbowOn(t, c, 1); } }), "Bottom right, rainbow travelling through it.", { lin: 1 }),
+            P("Shadow", "self", wm(1, 1, { op: 85, f: function (t, c, comp) { dropShadow(comp, [t]); } }), "Bottom right with zalii's drop shadow.", { lin: 1 }),
+            P("Outline", "self", wm(1, 1, { op: 60, f: wmOutline }), "Outline only.", { lin: 1 }),
+            P("Pulse", "self", wm(1, 1, { f: wmPulse }), "Fades in and out all the time.", { lin: 1 }),
+            P("Bounce", "self", wm(0.5, 0.5, { op: 35, f: wmBounce }), "Bounces off the edges for the whole comp.", { lin: 1 }),
+            P("Corner Hop", "self", wm(1, 1, { f: wmHop }), "Jumps to the next corner every 4 seconds.", { lin: 1 }),
+            P("Ticker", "self", wm(0, 1, { f: wmTicker }), "Crosses the bottom of the frame again and again.", { lin: 1 }),
+            P("Tiled", "self", wm(0.5, 0.5, { op: 12, f: wmTiled }), "Repeated all over the frame, very faint.", { lin: 1 }),
+            P("Pop Up", "self", wm(1, 1, { f: wmPop }), "Shows for 3 seconds from the playhead.", { lin: 1 })
+        ]],
         ["Tools", [
+            P("Beat Markers (main hits)", "self", beatMarkers(1.6), "Markers on the hardest hits of the selected song.", { lin: 1 }),
+            P("Beat Markers (normal)", "self", beatMarkers(0.8), "Markers on most beats.", { lin: 1 }),
+            P("Beat Markers (every hit)", "self", beatMarkers(0.2), "Markers on every small hit.", { lin: 1 }),
+            P("Clear Markers", "self", clearMarkers, "Removes the markers from the selected layers.", { lin: 1 }),
             P("List effect params", "tool", listParams, "Lists every parameter of the selected effect."),
             P("Plugin check", "tool", plugCheck, "Shows which plugins the panel found."),
             P("Show last notes", "tool", lastNotes, "Shows the notes from the last preset you applied.")
@@ -1897,12 +2515,13 @@
             "One-click edit presets for crystal pvp edits.\n\n" +
             "HOW TO USE\n" +
             "1. Park the playhead on the hit, beat or cut.\n" +
-            "2. Pick a category and a preset.\n" +
-            "3. Press Apply, or double-click the preset.\n\n" +
+            "2. Pick a category.\n" +
+            "3. Click a preset. One click applies it.\n\n" +
             "Shakes and FX start on the playhead.\n" +
             "Transitions peak on the playhead: park it on the cut.\n" +
             "Build-ups end on the playhead: park it on the drop.\n" +
-            "Text and Time Remap presets work on the selected layers.\n\n" +
+            "Text, Time Remap and Audio presets work on the selected layers.\n" +
+            "Text ins start where the text layer starts, outs end where it ends.\n\n" +
             "Everything is keyframes. Press U on the layer and reshape any curve in the Graph Editor.\n\n" +
             "PLUGINS ON THIS PC\n" + plugLines().join("\n") + "\n\n" +
             "Missing plugins fall back to built-in effects where possible. Presets that cannot work are marked \"needs ...\" in the list.\n\n" +
@@ -1961,11 +2580,6 @@
         ui.desc.preferredSize = [230, 30];
         pen(ui.desc, DIM);
 
-        ui.apply = main.add("button", undefined, "Apply");
-        ui.apply.alignment = ["fill", "bottom"];
-        ui.apply.preferredSize = [230, 28];
-        ui.apply.helpTip = "Apply the selected preset (or double-click it)";
-
         var opts = main.add("group");
         opts.orientation = "row";
         opts.alignment = ["fill", "bottom"];
@@ -2012,7 +2626,7 @@
                 var it = ui.list.add("item", label(cur[p]));
                 if (!avail(cur[p])) { try { it.enabled = false; } catch (e) {} }
             }
-            ui.desc.text = GROUPS[n][0] + ": pick a preset.";
+            ui.desc.text = GROUPS[n][0] + ": click a preset to apply it.";
         }
 
         function picked() {
@@ -2032,13 +2646,14 @@
             if (ui.cat.selection) showCat(ui.cat.selection.index);
             releaseFocus();
         };
+        // one click applies. the selection is cleared so the same preset can be clicked again
         ui.list.onChange = function () {
             var def = picked();
             if (!def) return;
             ui.desc.text = avail(def) ? def.d : def.d + "  Needs " + fam(def.req[0]) + ".";
+            applyNow();
+            try { ui.list.selection = null; } catch (e) {}
         };
-        ui.list.onDoubleClick = applyNow;
-        ui.apply.onClick = applyNow;
         ui.target.onChange = function () { releaseFocus(); };
         ui.len.onChange = function () { releaseFocus(); };
         ui.hlp.onClick = function () {
