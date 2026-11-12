@@ -14,6 +14,7 @@
 - Fades are even from start to end. Keyframes show as normal eased keys.
 - Spin transitions zoom in less. New Glow Flicker and Light Sweep.
 - Beat markers moved to Tools.
+- New text uses tighter line spacing. Text Light Sweep adds rays and a glow swell so it shows on white text.
 
 ## 3.0
 

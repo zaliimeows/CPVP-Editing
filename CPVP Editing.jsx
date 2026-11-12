@@ -1421,6 +1421,8 @@
         d.fillColor = [1, 1, 1];
         d.applyStroke = false;
         d.tracking = 0;
+        try { d.autoLeading = false; } catch (eL0) {}
+        try { d.leading = d.fontSize * 0.95; } catch (eL1) {}
         d.justification = ParagraphJustification.CENTER_JUSTIFY;
         var off = ["fauxBold", "fauxItalic", "allCaps", "smallCaps", "superscript", "subscript"], zero = ["baselineShift", "tsume"], one = ["horizontalScale", "verticalScale"], q;
         for (q = 0; q < off.length; q++) { try { d[off[q]] = false; } catch (e0) {} }
@@ -1629,7 +1631,16 @@
     }
     var txSweep = eachText(function (l, c) {
         var b = box(l, c.t0);
-        lightSweep(l, c, b.l - 80 * c.sc, b.l + b.w + 80 * c.sc, b.t + b.h / 2);
+        var x0 = b.l - 80 * c.sc, x1 = b.l + b.w + 80 * c.sc, y = b.t + b.h / 2;
+        lightSweep(l, c, x0, x1, y);
+        // on bright text the bar alone hardly shows: rays and glow swell as it passes
+        var fx = addFx(l, ["S_Rays"], true);
+        if (fx) {
+            setP(fx, ["Threshold"], 0.5);
+            setP(fx, ["Rays Length"], 0.18);
+            animP(fx, ["Rays Brightness"], c, BUMP(1.6));
+        }
+        deepGlow(l, 200, 0, c, BUMP(0.6));
     }, 0.8, "at");
     function txGlowFlicker(comp, sel, c) { flicker(comp, textLayers(comp, sel), c); }
 
@@ -2375,7 +2386,7 @@
             P("Float", "self", txFloat, "Text drifts up and down.", { lin: 1 }),
             P("Pan Right", "self", txPan(1), "Slow drift to the right for the whole layer.", { lin: 1 }),
             P("Pan Left", "self", txPan(-1), "Slow drift to the left for the whole layer.", { lin: 1 }),
-            P("Light Sweep", "self", txSweep, "Bar of light runs over the text, from the playhead.", { len: 0.8 })
+            P("Light Sweep", "self", txSweep, "Bar of light runs over the text with rays and a glow swell, from the playhead.", { len: 0.8 })
         ]],
         ["Text Out", [
             P("Fade Out", "self", txoFade, "Plain fade out at the end of the text layer.", { len: 0.6 }),
