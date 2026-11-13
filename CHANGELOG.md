@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.2
+
+- Rainbow Wave is split in two: Rainbow Wave only cycles the colours, the new Bob Wave only bobs the letters up and down.
+- Both come in Slow, normal and Fast, and they stack on the same text layer.
+
 ## 3.1
 
 - One click on a preset applies it. The Apply button is gone.

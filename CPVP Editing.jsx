@@ -1,4 +1,4 @@
-// CPVP Editing  v3.1  -  one-click edit presets for crystal pvp edits in After Effects
+// CPVP Editing  v3.2  -  one-click edit presets for crystal pvp edits in After Effects
 // made by zalii
 //
 // Copyright (c) 2026 zalii. All rights reserved. See LICENSE.
@@ -30,7 +30,7 @@
 
     // ---- CPVP Editing by zalii ---- identity
     var NAME = "CPVP Editing";
-    var VER = "3.1";
+    var VER = "3.2";
     var AUTHOR = "zalii";
     var CREDIT = NAME + " by " + AUTHOR;
 
@@ -1525,6 +1525,7 @@
     // selector offset: every letter moves in turn, with real keys and no wiggle selector
     function wave(l, c, name, props, period, phase, width) {
         var anims = l.property("ADBE Text Properties").property("ADBE Text Animators");
+        if (anims.property(name)) name += " " + (anims.numProperties + 1);
         var a = anims.addProperty("ADBE Text Animator");
         a.name = name;
         for (var i = 0; i < props.length; i++) {
@@ -1829,15 +1830,22 @@
         deepGlow(l, 220, 0.35, null, null);
     });
 
-    // colours cycle for the whole layer, each letter bobs and tilts in turn, with glow
-    var tfRainbowWave = eachText(function (l, c) {
-        addFx(l, ["ADBE 4ColorGradient"]);
-        var len = Math.max(1, Math.min(l.outPoint, c.t0 + 30) - c.t0);
-        hueKeys(l, { t0: c.t0, D: len, fd: c.fd }, [[0, 0], [1, 360 * Math.max(1, Math.round(len / 2))]]);
-        wave(l, c, "Bob", [["ADBE Text Position 3D", [0, -30, 0]]], 1.1, 0, 38);
-        wave(l, c, "Tilt", [["ADBE Text Rotation", 11]], 1.7, 0.4, 30);
-        deepGlow(l, 240, 0.5, null, null);
-    });
+    // colours cycle for the whole layer, one full turn every sec seconds, with glow
+    function tfRainbowWave(sec) {
+        return eachText(function (l, c) {
+            addFx(l, ["ADBE 4ColorGradient"]);
+            var len = Math.max(1, Math.min(l.outPoint, c.t0 + 30) - c.t0);
+            hueKeys(l, { t0: c.t0, D: len, fd: c.fd }, [[0, 0], [1, 360 * Math.max(1, Math.round(len / sec))]]);
+            deepGlow(l, 240, 0.5, null, null);
+        });
+    }
+
+    // each letter bobs up and down in turn, one wave every per seconds
+    function tfBobWave(per) {
+        return eachText(function (l, c) {
+            wave(l, c, "Bob Wave", [["ADBE Text Position 3D", [0, -30, 0]]], per, 0, 38);
+        });
+    }
 
     var tfChroma = eachText(function (l) { chroma(l, null, 0.35, null); });
 
@@ -2462,7 +2470,12 @@
             P("Rainbow Scroll Left", "self", tfRainbowScroll(-1), "Rainbow that travels to the left.", { lin: 1 }),
             P("Light Rays", "self", tfRays, "Rays from the text.", { lin: 1 }),
             P("Rainbow", "self", tfRainbow, "Rainbow gradient with glow.", { lin: 1 }),
-            P("Rainbow Wave", "self", tfRainbowWave, "Colours cycle, letters bob and tilt, with glow.", { lin: 1 }),
+            P("Rainbow Wave Slow", "self", tfRainbowWave(4), "Colours cycle slowly, with glow. Stacks with Bob Wave.", { lin: 1 }),
+            P("Rainbow Wave", "self", tfRainbowWave(2), "Colours cycle, with glow. Stacks with Bob Wave.", { lin: 1 }),
+            P("Rainbow Wave Fast", "self", tfRainbowWave(1), "Colours cycle fast, with glow. Stacks with Bob Wave.", { lin: 1 }),
+            P("Bob Wave Slow", "self", tfBobWave(1.8), "Letters bob up and down slowly, one after another.", { lin: 1 }),
+            P("Bob Wave", "self", tfBobWave(1.1), "Letters bob up and down, one after another.", { lin: 1 }),
+            P("Bob Wave Fast", "self", tfBobWave(0.6), "Letters bob up and down fast, one after another.", { lin: 1 }),
             P("Chroma Split", "self", tfChroma, "Colour fringes on the text.", { lin: 1 }),
             P("Shake", "self", tfShake, "Text shakes and settles.", { len: 0.5 }),
             P("3D Tilt", "self", tf3DTilt, "Tilts the text in 3D.", { lin: 1 }),

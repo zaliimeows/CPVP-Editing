@@ -12,7 +12,7 @@ Screenshots will be added here.
 
 ## Install
 
-1. Download `CPVP Editing.jsx`.
+1. Download `CPVP-Editing-<version>.zip` from the latest release and unzip it to get `CPVP Editing.jsx`.
 2. Close After Effects.
 3. Copy the file into the ScriptUI Panels folder:
    - Windows: `C:\Program Files\Adobe\Adobe After Effects <version>\Support Files\Scripts\ScriptUI Panels`
@@ -101,7 +101,7 @@ Typewriter, Scramble In, Slide Up, Drop In, Blur In, Pop In, Zoom Punch In, Flic
 Fade Out, Typewriter Out, Slide Out, Drop Out, Blur Out, Scramble Out, Scale Out, Pop Out, Shrink Out, Tracking Out, Flicker Out, Glitch Out
 
 **Text FX**
-Glow, Glow Pink, Glow Blue, Glow Light Blue, Glow Purple, Glow Red, Glow Gold, Glow Green, Glow Flicker, Neon Pink, Neon Blue, Outline Glow, Outline Glow Pink, Gradient Blue, Gradient Pink, Gradient Gold, Gradient Red, Gradient Green, Plasma Pink, Plasma Blue, Plasma Green, Plasma Purple, Flux Blue, Flux Red, Loops Texture, Scanlines, Bevel, Halftone, Drop Shadow, Rainbow Scroll Right, Rainbow Scroll Left, Light Rays, Rainbow, Rainbow Wave, Chroma Split, Shake, 3D Tilt, 3D Swing, 3D Flip In, 3D Extrude, 3D Text (Element), Motion Blur On
+Glow, Glow Pink, Glow Blue, Glow Light Blue, Glow Purple, Glow Red, Glow Gold, Glow Green, Glow Flicker, Neon Pink, Neon Blue, Outline Glow, Outline Glow Pink, Gradient Blue, Gradient Pink, Gradient Gold, Gradient Red, Gradient Green, Plasma Pink, Plasma Blue, Plasma Green, Plasma Purple, Flux Blue, Flux Red, Loops Texture, Scanlines, Bevel, Halftone, Drop Shadow, Rainbow Scroll Right, Rainbow Scroll Left, Light Rays, Rainbow, Rainbow Wave Slow, Rainbow Wave, Rainbow Wave Fast, Bob Wave Slow, Bob Wave, Bob Wave Fast, Chroma Split, Shake, 3D Tilt, 3D Swing, 3D Flip In, 3D Extrude, 3D Text (Element), Motion Blur On
 
 **Intros + Outros**
 Fade In Start, Zoom In Start, Blur In Start, Flash In Start, Title Reveal, Fade Out End, Zoom Out End, Blur Out End, Slow-Down Ending, End Card
