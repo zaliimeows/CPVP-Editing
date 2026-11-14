@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.3
+
+- New Captions category: Auto Captions listens to the clip and makes timed caption layers, 3 words, 1 word or 5 words at a time. Runs on your PC with Whisper, see the readme for the one-time setup.
+
 ## 3.2
 
 - Rainbow Wave is split in two: Rainbow Wave only cycles the colours, the new Bob Wave only bobs the letters up and down.

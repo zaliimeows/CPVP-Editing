@@ -1,4 +1,4 @@
-// CPVP Editing  v3.2  -  one-click edit presets for crystal pvp edits in After Effects
+// CPVP Editing  v3.3  -  one-click edit presets for crystal pvp edits in After Effects
 // made by zalii
 //
 // Copyright (c) 2026 zalii. All rights reserved. See LICENSE.
@@ -30,7 +30,7 @@
 
     // ---- CPVP Editing by zalii ---- identity
     var NAME = "CPVP Editing";
-    var VER = "3.2";
+    var VER = "3.3";
     var AUTHOR = "zalii";
     var CREDIT = NAME + " by " + AUTHOR;
 
@@ -2178,6 +2178,117 @@
         textBox(NAME + " - last notes", ui.last || "nothing applied yet");
     }
 
+    var CAP_PY = [
+        "import sys, os, subprocess",
+        "os.environ['HF_HUB_DISABLE_SYMLINKS_WARNING'] = '1'",
+        "try:",
+        "    import av",
+        "    if int(av.__version__.split('.')[0]) > 15: raise ImportError",
+        "    from faster_whisper import WhisperModel",
+        "except ImportError:",
+        "    subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'faster-whisper', 'av<16'])",
+        "    sys.exit(subprocess.run([sys.executable] + sys.argv).returncode)",
+        "m = WhisperModel('small', device='cpu', compute_type='int8')",
+        "sg, inf = m.transcribe(sys.argv[1], word_timestamps=True)",
+        "ln = []",
+        "for s in sg:",
+        "    for w in s.words:",
+        "        ln.append('%.3f\t%.3f\t%s\n' % (w.start, w.end, w.word.strip()))",
+        "with open(sys.argv[2], 'w', encoding='utf-8') as f:",
+        "    f.write(''.join(ln))"
+    ].join("\n");
+
+    function capRun(file) {
+        var dir = new Folder(Folder.userData.fsName + "/CPVP Editing");
+        if (!dir.exists) dir.create();
+        var py = new File(dir.fsName + "/cap.py");
+        py.encoding = "UTF-8";
+        py.open("w");
+        py.write(CAP_PY);
+        py.close();
+        var out = new File(dir.fsName + "/cap.txt");
+        if (out.exists) out.remove();
+        var args = " \"" + py.fsName + "\" \"" + file.fsName + "\" \"" + out.fsName + "\"";
+        system.callSystem("cmd /c py -3" + args);
+        if (!out.exists) system.callSystem("cmd /c python" + args);
+        if (!out.exists) return null;
+        var w = [], p;
+        out.encoding = "UTF-8";
+        out.open("r");
+        while (!out.eof) {
+            p = out.readln().split("\t");
+            if (p.length === 3 && p[2] !== "") w.push({ a: parseFloat(p[0]), b: parseFloat(p[1]), s: p[2] });
+        }
+        out.close();
+        return w;
+    }
+
+    function capSrc(comp, sel) {
+        var i, l;
+        for (i = 0; i < sel.length; i++) {
+            l = sel[i];
+            if (l.hasAudio && l.source && l.source.file) return l;
+        }
+        for (i = 1; i <= comp.numLayers; i++) {
+            l = comp.layer(i);
+            if (l.hasAudio && l.audioEnabled && l.source && l.source.file) return l;
+        }
+        return null;
+    }
+
+    function capText(comp, str, at, dur) {
+        var sz = Math.round(Math.min(comp.width, comp.height) * 0.08);
+        var t = newText(comp, str, sz, at, dur);
+        var tp = t.property("ADBE Text Properties").property("ADBE Text Document"), d = tp.value;
+        d.applyStroke = true;
+        d.strokeColor = [0, 0, 0];
+        d.strokeWidth = Math.round(sz * 0.12);
+        d.strokeOverFill = false;
+        tp.setValue(d);
+        tr(t, "ADBE Position").setValue([comp.width / 2, comp.height * 0.72]);
+        var sc = tr(t, "ADBE Scale"), e = new KeyframeEase(0, 75);
+        sc.setValueAtTime(at, [80, 80]);
+        sc.setValueAtTime(at + 3 * comp.frameDuration, [100, 100]);
+        sc.setTemporalEaseAtKey(2, [e, e, e], [e, e, e]);
+        t.name = str;
+        return t;
+    }
+
+    function autoCap(n) {
+        return function (comp, sel, c) {
+            var l = capSrc(comp, sel);
+            if (!l) { warn("Select a video or sound layer with talking in it."); return; }
+            var w = $.global.CPVP_CAPW, ok = 1;
+            if (!w) {
+                try { ok = app.preferences.getPrefAsLong("Main Pref Section", "Pref_SCRIPTING_FILE_NETWORK_SECURITY"); } catch (e) {}
+                if (!ok) { warn("Turn on Edit > Preferences > Scripting & Expressions > Allow Scripts to Write Files and Access Network, then try again."); return; }
+                w = capRun(l.source.file);
+            }
+            if (w === null) { warn("Captions need Python. Install it from python.org (tick Add to PATH), then try again."); return; }
+            if (w.length === 0) { warn("No talking found in " + l.name + "."); return; }
+            var k = l.stretch / 100, i = 0, j, a, b, s, made = 0;
+            for (j = 0; j < w.length; j++) {
+                w[j].a = l.startTime + w[j].a * k;
+                w[j].b = l.startTime + w[j].b * k;
+            }
+            while (i < w.length) {
+                j = i + 1;
+                while (j < w.length && j - i < n && w[j].a - w[j - 1].b < 0.4 && !/[.,!?]$/.test(w[j - 1].s)) j++;
+                a = w[i].a;
+                b = w[j - 1].b + 0.5;
+                if (j < w.length) b = Math.min(b, w[j].a);
+                s = [];
+                for (var q = i; q < j; q++) s.push(w[q].s);
+                if (a >= l.inPoint && a < l.outPoint) {
+                    capText(comp, s.join(" ").replace(/[.,;:]+/g, "").toUpperCase(), a, Math.max(b - a, c.fd));
+                    made++;
+                }
+                i = j;
+            }
+            log.push(made + " captions from " + l.name);
+        };
+    }
+
     // ================================================================ PRESET TABLE
     // CPVP Editing by zalii
     // P(name, kind, fn, description, {len: auto seconds, req: [needs one of], lin: 1})
@@ -2422,6 +2533,11 @@
             P("Pan Left", "self", txPan(-1), "Slow drift to the left for the whole layer.", { lin: 1 }),
             P("Light Sweep", "self", txSweep, "Bar of light runs over the text with rays and a glow swell, from the playhead.", { len: 0.8 })
         ]],
+        ["Captions", [
+            P("Auto Captions", "self", autoCap(3), "Listens to the selected clip and adds captions, up to 3 words each. After Effects freezes while it listens.", {}),
+            P("Auto Captions 1 Word", "self", autoCap(1), "Same, one word at a time.", {}),
+            P("Auto Captions 5 Words", "self", autoCap(5), "Same, longer lines for talking parts.", {})
+        ]],
         ["Text Out", [
             P("Fade Out", "self", txoFade, "Plain fade out at the end of the text layer.", { len: 0.6 }),
             P("Typewriter Out", "self", txoType, "Letters disappear one by one.", { len: 0.6 }),
@@ -2571,6 +2687,7 @@
             "Transitions peak on the playhead: park it on the cut.\n" +
             "Build-ups end on the playhead: park it on the drop.\n" +
             "Text, Time Remap and Audio presets work on the selected layers.\n" +
+            "Auto Captions listens to the selected clip, or the first layer with sound. It needs Python, and the first run downloads the speech model.\n" +
             "Text ins start where the text layer starts, outs end where it ends.\n\n" +
             "Everything is keyframes. Press U on the layer and reshape any curve in the Graph Editor.\n\n" +
             "PLUGINS ON THIS PC\n" + plugLines().join("\n") + "\n\n" +

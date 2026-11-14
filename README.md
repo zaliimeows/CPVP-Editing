@@ -20,7 +20,13 @@ Screenshots will be added here.
 4. Start After Effects and open the panel from the Window menu: `CPVP Editing.jsx`.
 5. Dock it wherever you like.
 
-Made for After Effects 2024. No setting changes are needed: the panel does not write files or use the network.
+Made for After Effects 2024. Everything except Auto Captions works without changing any settings.
+
+### Auto Captions setup
+
+1. Install Python 3 from python.org and tick `Add python.exe to PATH`.
+2. In After Effects turn on `Edit > Preferences > Scripting & Expressions > Allow Scripts to Write Files and Access Network`.
+3. The first time you use Auto Captions it installs `faster-whisper` and downloads the speech model (about 500 MB). After that it runs offline on your PC.
 
 ## How to use
 
@@ -38,6 +44,8 @@ Controls:
 - **?**: help, and the list of plugins the panel found on your PC.
 
 Text presets work on the selected text layers. With no text layer selected they make a new one, centered and white. Text ins start where the text layer starts, outs end where it ends, and they keep the size and opacity of your layer. Time Remap, Audio, beat markers and a few others need a selected clip or song layer.
+
+Auto Captions listens to the selected clip, or the first layer with sound if nothing is selected, and makes one text layer per caption, timed to the words. After Effects freezes while it listens, about 10 seconds for a short edit.
 
 Every layer the panel creates has `CPVP Editing by zalii` in its Comment field.
 
@@ -96,6 +104,9 @@ Fade In, Fade Out, Muffle, Muffle In, Muffle Until Drop, Duck, Quieter (-6 dB), 
 
 **Text**
 Typewriter, Scramble In, Slide Up, Drop In, Blur In, Pop In, Zoom Punch In, Flicker In, Tracking In, Glitch In, Slide Down, Slide Left, Slide Right, Scale In, Spin In, Stretch In, Skew In, Bounce In, Fade In, Wavy, Pulse, Float, Pan Right, Pan Left, Light Sweep
+
+**Captions**
+Auto Captions, Auto Captions 1 Word, Auto Captions 5 Words
 
 **Text Out**
 Fade Out, Typewriter Out, Slide Out, Drop Out, Blur Out, Scramble Out, Scale Out, Pop Out, Shrink Out, Tracking Out, Flicker Out, Glitch Out
